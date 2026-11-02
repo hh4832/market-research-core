@@ -50,7 +50,7 @@ def read_bars(path: Path) -> pd.DataFrame:
     frame = pd.read_parquet(path)
     ts_col = _first_column(frame, TIMESTAMP_CANDIDATES)
     frame = frame.copy()
-    frame[ts_col] = pd.to_datetime(frame[ts_col], utc=True, errors="raise")
+    parsed = pd.to_datetime(frame[ts_col], utc=True, errors="raise")\n    # pandas 3 may preserve Arrow microsecond resolution; normalize the UTC contract to nanoseconds.\n    frame[ts_col] = parsed.dt.as_unit("ns")
     frame = frame.set_index(ts_col, drop=False).sort_index()
     if frame.index.has_duplicates:
         raise PolicyViolation("Normalized data contains duplicate timestamps")
