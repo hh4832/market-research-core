@@ -67,9 +67,10 @@ def make_tw_root(tmp_path: Path, monkeypatch) -> Path:
     final_dir.mkdir(parents=True)
     (final_dir / "run_manifest.json").write_text(json.dumps({"run_id": tw.TW_FINAL_GATE_RUN, "verdict": "SCOPED GO", "pins": {
         "fubon_5m": {"seq": 68, "version_dir": tw.TW_FUBON_VERSION},
-        "quality_mask": {"sha256": tw.TW_QUALITY_SHA256, "evidence_version": tw.TW_EVIDENCE_VERSION},
-        "corporate_actions_v2": {"dir": tw.TW_CA_DIR}, "trading_rules": {"dir": tw.TW_RULES_DIR},
-        "universe_pit": {"dir": tw.TW_UNIVERSE_DIR}}}))
+        "quality_mask": {"sha256": tw.TW_QUALITY_SHA256, "evidence_version": [tw.TW_EVIDENCE_VERSION]},
+        "corporate_actions_v2": {"dir": f"/content/drive/MyDrive/data/{tw.TW_CA_DIR}"},
+        "trading_rules": {"dir": f"/content/drive/MyDrive/data/{tw.TW_RULES_DIR}"},
+        "universe_pit": {"dir": f"/content/drive/MyDrive/data/{tw.TW_UNIVERSE_DIR}"}}}))
     return root
 
 
