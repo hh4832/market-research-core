@@ -46,6 +46,7 @@ def make_tw_root(tmp_path: Path, monkeypatch) -> Path:
     (fubon / "_manifest/published.json").write_text(json.dumps({"seq": 68, "version_dir": tw.TW_FUBON_VERSION}))
 
     dates = pd.to_datetime(["2025-01-02"])
+    universe_dates = pd.to_datetime(["2025-01-01", "2025-01-02"])
     quality = pd.DataFrame({"symbol": ["2330"], "date": dates, "can_use_for_price_backtest": [True],
         "research_tier": ["LEVEL_B_PRICE_GATE"], "evidence_version": [tw.TW_EVIDENCE_VERSION]})
     qdir = root / tw.TW_PINNED_PATHS["quality"]
@@ -60,8 +61,8 @@ def make_tw_root(tmp_path: Path, monkeypatch) -> Path:
         "price_limit_status": ["VERIFIED_OFFICIAL_NEXT_DAY"], "buy_eligibility": ["ELIGIBLE_SUBJECT_TO_LIQUIDITY"],
         "sell_eligibility": ["ELIGIBLE_SUBJECT_TO_LIQUIDITY"]})})
     universe = root / tw.TW_PINNED_PATHS["universe"]
-    manifest_dir(universe, {"universe_panel.parquet": pd.DataFrame({"symbol": ["2330"], "date": dates,
-        "official_listed": [True], "security_type": ["COMMON_STOCK"]})})
+    manifest_dir(universe, {"universe_panel.parquet": pd.DataFrame({"symbol": ["2330", "2330"], "date": universe_dates,
+        "official_listed": [True, True], "security_type": ["COMMON_STOCK", "COMMON_STOCK"]})})
     final_dir = root / "_tw-market-data-lake/audits/final_gate" / tw.TW_FINAL_GATE_RUN
     final_dir.mkdir(parents=True)
     (final_dir / "run_manifest.json").write_text(json.dumps({"run_id": tw.TW_FINAL_GATE_RUN, "verdict": "SCOPED GO", "pins": {
@@ -88,6 +89,7 @@ def test_old_ibkr_interface_and_unified_interface(tmp_path):
     unified = client.load(market="IBKR", symbol="TSM")
     assert unified.provenance.market == "IBKR"
     assert {"data_exists", "research_eligible", "backtest_eligible", "execution_eligible"}.issubset(unified.frame.columns)
+    assert (unified.frame.available_at > unified.frame.timestamp).all()
 
 
 def test_taiwan_adapter_enforces_pins_and_pit(monkeypatch, tmp_path):

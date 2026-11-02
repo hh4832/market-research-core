@@ -108,5 +108,7 @@ def _standardize(frame: pd.DataFrame, symbol: str, market: str, *, contract: str
     out["research_eligible"] = True
     out["backtest_eligible"] = True
     out["execution_eligible"] = True
-    out["available_at"] = out["timestamp"]
+    # Validated 1-minute snapshots use minute-start labels; OHLCV is complete
+    # only after the minute ends.
+    out["available_at"] = out["timestamp"] + pd.Timedelta(minutes=1)
     return out

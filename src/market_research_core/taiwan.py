@@ -184,6 +184,8 @@ class TaiwanEquityAdapter:
         u = universe.loc[universe.symbol == symbol]
         if u.empty:
             raise PolicyViolation(f"No PIT universe evidence for {symbol}")
+        u = u.sort_values("date").copy()
+        u["pit_eligible"] = u["official_listed"].shift(1).map(_truth).fillna(False)
         type_col = next((c for c in ("security_type", "instrument_class", "category") if c in u.columns), None)
         if type_col and u[type_col].astype(str).str.upper().isin(FUND_LIKE).any():
             raise PolicyViolation(f"{symbol} is outside the common-stock SCOPED_GO universe")
@@ -198,13 +200,14 @@ class TaiwanEquityAdapter:
         out = bars.merge(q, on=["symbol", "date"], how="left", suffixes=("", "_quality"))
         out = out.merge(u, on=["symbol", "date"], how="left", suffixes=("", "_pit"))
         out = out.merge(r, on=["symbol", "date"], how="left", suffixes=("", "_rule"))
-        required = ["can_use_for_price_backtest", "official_listed", "price_limit_status", "buy_eligibility", "sell_eligibility"]
+        required = ["can_use_for_price_backtest", "official_listed", "pit_eligible", "price_limit_status", "buy_eligibility", "sell_eligibility"]
         missing = [c for c in required if c not in out.columns]
         if missing:
             raise PolicyViolation(f"Taiwan contract columns missing: {', '.join(missing)}")
         out["data_exists"] = True
         out["research_eligible"] = out["official_listed"].map(_truth) & out["research_tier"].fillna("UNKNOWN").ne("ISOLATE")
-        out["backtest_eligible"] = out["research_eligible"] & out["can_use_for_price_backtest"].map(_truth)
+        out["backtest_eligible"] = (out["research_eligible"] & out["pit_eligible"].map(_truth)
+            & out["can_use_for_price_backtest"].map(_truth))
         out["execution_eligible"] = (out["backtest_eligible"] & out["price_limit_status"].isin(USABLE_LIMIT_STATUS)
             & out["buy_eligibility"].isin(ELIGIBLE_EXECUTION) & out["sell_eligibility"].isin(ELIGIBLE_EXECUTION)
             & out["volume"].fillna(0).gt(0))
