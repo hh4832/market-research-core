@@ -36,7 +36,8 @@ def make_tw_root(tmp_path: Path, monkeypatch) -> Path:
     data_file.parent.mkdir(parents=True)
     times = pd.date_range("2025-01-02 09:00", periods=30, freq="5min", tz="Asia/Taipei")
     pd.DataFrame({"symbol": "2330", "bar_start": times, "open": range(100, 130),
-        "high": range(101, 131), "low": range(99, 129), "close": range(100, 130), "volume": 1000}).to_parquet(data_file, index=False)
+        "high": range(101, 131), "low": range(99, 129), "close": range(100, 130),
+        "volume_raw": 1000, "volume_unit": "lot"}).to_parquet(data_file, index=False)
     vdir = fubon / "_manifest" / tw.TW_FUBON_VERSION
     vdir.mkdir(parents=True)
     parts = pd.DataFrame([{"partition": "symbol=2330/year=2025", "relpath": data_file.relative_to(fubon).as_posix(),
