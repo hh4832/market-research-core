@@ -41,7 +41,20 @@ def make_run(tmp_path: Path) -> Path:
 def patch_policy(monkeypatch, root: Path):
     digest = hashlib.sha256((root / "diagnostics" / "predeclared_sample_matrix.csv").read_bytes()).hexdigest()
     monkeypatch.setattr("market_research_core.txf.TXF_SAMPLE_MATRIX_SHA256", digest)
+    monkeypatch.setattr("market_research_core.txf.TXF_SAMPLE_MATRIX_FILE_SHA256", digest)
     monkeypatch.setattr("market_research_core.txf.TXF_EXPECTED_ROWS", TXF_EXPECTED_PRIMARY_FILES)
+
+def test_canonical_and_file_hashes_are_distinct(monkeypatch, tmp_path: Path):
+    root = make_run(tmp_path)
+    raw_digest = hashlib.sha256((root / "diagnostics" / "predeclared_sample_matrix.csv").read_bytes()).hexdigest()
+    canonical_digest = "producer-canonical-hash"
+    info_path = root / "run_info.txt"
+    info_path.write_text(info_path.read_text().replace(raw_digest, canonical_digest))
+    monkeypatch.setattr("market_research_core.txf.TXF_SAMPLE_MATRIX_SHA256", canonical_digest)
+    monkeypatch.setattr("market_research_core.txf.TXF_SAMPLE_MATRIX_FILE_SHA256", raw_digest)
+    monkeypatch.setattr("market_research_core.txf.TXF_EXPECTED_ROWS", TXF_EXPECTED_PRIMARY_FILES)
+    loaded = TXFAdapter.from_run_dir(root).load()
+    assert len(loaded.frame) == TXF_EXPECTED_PRIMARY_FILES
 
 def test_pinned_formal_run_loads(monkeypatch, tmp_path: Path):
     root = make_run(tmp_path); patch_policy(monkeypatch, root)
