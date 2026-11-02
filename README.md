@@ -42,10 +42,12 @@ returns provenance. It never forward-fills, interpolates, or synthesizes bars.
 - `IBKR-market-data-cleaning-pipeline`: acquisition, recovery, QC, FINAL GATE
 - `market-research-core`: read-only adapters, policy enforcement, backtests, agents
 
-TXF is available through a separate fail-closed `TXFAdapter`. It consumes an
-explicit approval manifest for the recorded 185-day / 206,938-row validation
-slice; it does not treat all 473 weekly raw-cache partitions as validated.
-Existing historical gates are consumed, not repeated.
+TXF is available through a separate fail-closed `TXFAdapter`. It pins formal
+validation run `20261014_213932_404db609cf13` (185 sampled trade dates,
+206,938 continuous-contract rows, `PASS WITH CAVEATS`) and reads only the 58
+predeclared primary `1!` session files. It does not treat all 473 weekly raw
+cache partitions as validated. Existing historical gates are consumed, not
+repeated.
 
 ## Colab Drive smoke test
 
@@ -56,7 +58,7 @@ NQ/ES quarterly contracts and verifies aggregate published row counts. It never
 constructs a continuous future.
 
 TXF has a separate [Drive smoke notebook](notebooks/colab_txf_drive_smoke_test.ipynb).
-It first confirms the raw-cache inventory, then requires the approved
-cache-to-validation manifest. Until that manifest exists, the notebook stops
-with `STOPPED_FAIL_CLOSED` and does not substitute all 473 partitions.
+It mounts Drive, verifies the pinned formal run metadata, sample-matrix SHA256,
+integrity metrics and query plan, then loads the 58 approved primary files and
+requires exactly 206,938 rows.
 

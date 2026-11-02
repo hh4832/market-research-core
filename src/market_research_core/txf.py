@@ -1,5 +1,5 @@
+import ast
 import hashlib
-import json
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -7,33 +7,32 @@ import pandas as pd
 
 from .errors import PolicyViolation, SnapshotMismatch
 
-
-TXF_VERDICT = "SCOPED_GO"
+TXF_RUN_NAME = "20261014_213932_404db609cf13"
+TXF_PRODUCER_SHA = "404db609cf136aae050e09f1e7712a7894f6ab6d"
+TXF_SAMPLE_MATRIX_SHA256 = "13b24c1defe3b58eba7092adfe4cf66a9e5f067b7862c8aff4c603d4962c4c9f"
+TXF_VERDICT = "PASS WITH CAVEATS"
 TXF_EXPECTED_ROWS = 206_938
 TXF_EXPECTED_DAYS = 185
-TXF_TIMESTAMP_COLUMNS = ("timestamp", "datetime", "date", "time")
-TXF_CONTRACT_COLUMNS = ("contract_month", "contractMonth", "contract", "symbol")
+TXF_EXPECTED_REQUESTS = 106
+TXF_EXPECTED_PRIMARY_FILES = 58
 TXF_VALUE_COLUMNS = ("open", "high", "low", "close", "volume")
-
 
 @dataclass(frozen=True)
 class TXFLoadMetadata:
-    manifest_path: Path
+    run_dir: Path
+    producer_git_sha: str
     verdict: str
     scope: str
     source_files: tuple[Path, ...]
     rows_before_filter: int
     rows_after_filter: int
-    exact_duplicates_removed: int
     requested_start: str | None
     requested_end: str | None
-
 
 @dataclass(frozen=True)
 class LoadedTXFBars:
     frame: pd.DataFrame
     metadata: TXFLoadMetadata
-
 
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -42,146 +41,122 @@ def _sha256(path: Path) -> str:
             digest.update(chunk)
     return digest.hexdigest()
 
-
-def _first_column(frame: pd.DataFrame, candidates: tuple[str, ...], label: str) -> str:
-    lookup = {str(column).lower(): str(column) for column in frame.columns}
-    for candidate in candidates:
-        if candidate.lower() in lookup:
-            return lookup[candidate.lower()]
-    raise PolicyViolation(f"TXF data lacks {label}; expected one of {', '.join(candidates)}")
-
+def _parse_run_info(path: Path) -> dict[str, object]:
+    if not path.is_file():
+        raise SnapshotMismatch("TXF run_info.txt is missing")
+    values: dict[str, object] = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip() or "=" not in line:
+            continue
+        key, raw = line.split("=", 1)
+        try:
+            values[key] = ast.literal_eval(raw)
+        except (ValueError, SyntaxError):
+            values[key] = raw.strip()
+    return values
 
 class TXFAdapter:
-    """Read only an explicitly approved TXF validation slice.
+    """Read the pinned, formally validated TXF sample without re-running QA."""
 
-    This adapter does not promote the 473 weekly cache partitions to a validated
-    full-history dataset. Every readable parquet must be named and hashed in the
-    supplied approval manifest.
-    """
-
-    def __init__(self, cache_dir: Path, manifest_path: Path):
-        self.cache_dir = cache_dir.resolve()
-        self.manifest_path = manifest_path.resolve()
-        self.manifest = self._verify_manifest()
+    def __init__(self, run_dir: Path):
+        self.run_dir = run_dir.resolve()
+        self.scope = self._verify_run()
+        self.source_files = self._resolve_primary_files()
 
     @classmethod
-    def from_manifest(
-        cls, cache_dir: str | Path, manifest_path: str | Path
-    ) -> "TXFAdapter":
-        return cls(Path(cache_dir), Path(manifest_path))
+    def from_run_dir(cls, run_dir: str | Path) -> "TXFAdapter":
+        return cls(Path(run_dir))
 
-    def _verify_manifest(self) -> dict:
-        if not self.manifest_path.is_file():
-            raise SnapshotMismatch("TXF approval manifest is missing")
-        try:
-            manifest = json.loads(self.manifest_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
-            raise SnapshotMismatch("TXF approval manifest is unreadable") from exc
+    def _verify_run(self) -> str:
+        if self.run_dir.name != TXF_RUN_NAME:
+            raise SnapshotMismatch(f"Unpinned TXF run directory: {self.run_dir.name}")
+        info = _parse_run_info(self.run_dir / "run_info.txt")
+        expected = {
+            "git_commit": TXF_PRODUCER_SHA,
+            "execution_status": "COMPLETED",
+            "validation_phase": "final_cross_year_historical_integrity",
+            "sample_matrix_sha256": TXF_SAMPLE_MATRIX_SHA256,
+            "sample_trade_date_count": TXF_EXPECTED_DAYS,
+            "expected_logical_request_count": TXF_EXPECTED_REQUESTS,
+            "logical_request_count": TXF_EXPECTED_REQUESTS,
+            "api_error_count": 0,
+            "final_integrity_status": TXF_VERDICT,
+        }
+        for key, value in expected.items():
+            if info.get(key) != value:
+                raise SnapshotMismatch(f"TXF run_info mismatch for {key}: {info.get(key)!r}")
+        matrix = self.run_dir / "diagnostics" / "predeclared_sample_matrix.csv"
+        if not matrix.is_file() or _sha256(matrix) != TXF_SAMPLE_MATRIX_SHA256:
+            raise SnapshotMismatch("TXF sample matrix checksum mismatch")
+        metrics_path = self.run_dir / "diagnostics" / "final_historical_integrity_summary.csv"
+        if not metrics_path.is_file():
+            raise SnapshotMismatch("TXF final integrity summary is missing")
+        metrics_frame = pd.read_csv(metrics_path)
+        if not {"metric", "value"}.issubset(metrics_frame.columns):
+            raise SnapshotMismatch("TXF final integrity summary schema mismatch")
+        metrics = dict(zip(metrics_frame["metric"].astype(str), metrics_frame["value"]))
+        required_metrics = {
+            "trade_dates_tested": TXF_EXPECTED_DAYS, "continuous_rows": TXF_EXPECTED_ROWS,
+            "schema_failures": 0, "OHLC_invalid_rows": 0, "duplicate_rows": 0,
+            "outside_session_rows": 0, "missing_contract_month_rows": 0,
+            "partial_session_switches": 0, "rollover_OHLC_mismatches": 0,
+            "active_asymmetric_missing_rows": 0, "external_spot_check_matches": 80,
+            "external_spot_check_unresolved": 0,
+        }
+        for key, expected_value in required_metrics.items():
+            try:
+                actual = int(metrics.get(key))
+            except (TypeError, ValueError):
+                raise SnapshotMismatch(f"TXF integrity metric is missing: {key}") from None
+            if actual != expected_value:
+                raise SnapshotMismatch(f"TXF integrity metric mismatch for {key}: {actual}")
+        return str(info.get("scope_language", "")).strip()
 
-        if manifest.get("dataset") != "TXF_1MIN":
-            raise SnapshotMismatch("TXF manifest dataset must be TXF_1MIN")
-        if manifest.get("verdict") != TXF_VERDICT:
-            raise SnapshotMismatch("TXF manifest verdict must be SCOPED_GO")
-        if manifest.get("expected_rows") != TXF_EXPECTED_ROWS:
-            raise SnapshotMismatch("TXF approved row count must be 206938")
-        if manifest.get("expected_days") != TXF_EXPECTED_DAYS:
-            raise SnapshotMismatch("TXF approved day count must be 185")
-        if not str(manifest.get("scope", "")).strip():
-            raise SnapshotMismatch("TXF manifest scope is required")
-        partitions = manifest.get("partitions")
-        if not isinstance(partitions, list) or not partitions:
-            raise SnapshotMismatch("TXF manifest must contain approved partitions")
-
-        names: set[str] = set()
-        for item in partitions:
-            if not isinstance(item, dict):
-                raise SnapshotMismatch("Invalid TXF partition entry")
-            name = str(item.get("file", ""))
-            if Path(name).name != name or not name.endswith(".parquet"):
-                raise SnapshotMismatch(f"Unsafe TXF partition name: {name}")
-            if name in names:
-                raise SnapshotMismatch(f"Duplicate TXF partition in manifest: {name}")
-            names.add(name)
-            expected_hash = str(item.get("sha256", "")).lower()
-            if len(expected_hash) != 64 or any(c not in "0123456789abcdef" for c in expected_hash):
-                raise SnapshotMismatch(f"Invalid SHA256 for TXF partition: {name}")
-        return manifest
-
-    def _read_partition(self, item: dict) -> pd.DataFrame:
-        path = self.cache_dir / item["file"]
-        if not path.is_file():
-            raise SnapshotMismatch(f"Approved TXF partition is missing: {path.name}")
-        actual_hash = _sha256(path)
-        if actual_hash != item["sha256"].lower():
-            raise SnapshotMismatch(f"TXF partition checksum mismatch: {path.name}")
-
-        sidecar_path = self.cache_dir / f"{path.stem}.json"
-        if not sidecar_path.is_file():
-            raise SnapshotMismatch(f"TXF sidecar is missing: {sidecar_path.name}")
-        try:
-            sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
-            raise SnapshotMismatch(f"TXF sidecar is unreadable: {sidecar_path.name}") from exc
-        if sidecar.get("sha256") != actual_hash:
-            raise SnapshotMismatch(f"TXF sidecar checksum mismatch: {sidecar_path.name}")
-        params = sidecar.get("params", {})
-        if params.get("product") != "TXF" or str(params.get("timeframe")) != "1":
-            raise SnapshotMismatch(f"TXF sidecar request is not TXF 1-minute: {sidecar_path.name}")
-
-        frame = pd.read_parquet(path).copy()
-        timestamp_column = _first_column(frame, TXF_TIMESTAMP_COLUMNS, "timestamp")
-        contract_column = _first_column(frame, TXF_CONTRACT_COLUMNS, "actual contract month")
-        missing_values = [column for column in TXF_VALUE_COLUMNS if column not in frame.columns]
-        if missing_values:
-            raise PolicyViolation(f"TXF data lacks OHLCV columns: {', '.join(missing_values)}")
-        frame["_timestamp_taipei"] = pd.to_datetime(frame[timestamp_column], errors="raise")
-        if frame["_timestamp_taipei"].dt.tz is None:
-            frame["_timestamp_taipei"] = frame["_timestamp_taipei"].dt.tz_localize(
-                "Asia/Taipei", ambiguous="raise", nonexistent="raise"
-            )
-        else:
-            frame["_timestamp_taipei"] = frame["_timestamp_taipei"].dt.tz_convert("Asia/Taipei")
-        if frame[contract_column].isna().any() or (frame[contract_column].astype(str).str.strip() == "").any():
-            raise PolicyViolation("TXF actual contract month contains missing values")
-        frame["_actual_contract_month"] = frame[contract_column].astype(str).str.strip()
-        frame["_source_partition"] = path.name
-        return frame
+    def _resolve_primary_files(self) -> tuple[Path, ...]:
+        plan_path = self.run_dir / "diagnostics" / "predeclared_query_plan.csv"
+        if not plan_path.is_file():
+            raise SnapshotMismatch("TXF predeclared query plan is missing")
+        plan = pd.read_csv(plan_path)
+        required = {"name", "session", "contract_query", "role"}
+        if not required.issubset(plan.columns):
+            raise SnapshotMismatch("TXF query plan schema mismatch")
+        primary = plan.loc[(plan["role"] == "primary") & (plan["contract_query"] == "1!") & plan["session"].isin(["regular", "afterhours"])]
+        files = tuple(self.run_dir / "data" / f"{name}.parquet" for name in primary["name"])
+        if len(files) != TXF_EXPECTED_PRIMARY_FILES:
+            raise SnapshotMismatch(f"Expected {TXF_EXPECTED_PRIMARY_FILES} TXF primary files; found {len(files)}")
+        missing = [path.name for path in files if not path.is_file()]
+        if missing:
+            raise SnapshotMismatch(f"TXF primary files are missing: {', '.join(missing[:3])}")
+        return files
 
     def load(self, *, start: str | None = None, end: str | None = None) -> LoadedTXFBars:
-        frames = [self._read_partition(item) for item in self.manifest["partitions"]]
+        frames: list[pd.DataFrame] = []
+        for path in self.source_files:
+            frame = pd.read_parquet(path).copy()
+            required = {"timestamp", "actual_contract_month", "session", *TXF_VALUE_COLUMNS}
+            if not required.issubset(frame.columns):
+                raise PolicyViolation(f"TXF file schema mismatch: {path.name}")
+            if frame["actual_contract_month"].isna().any():
+                raise PolicyViolation(f"TXF actual contract month is missing: {path.name}")
+            frame["timestamp"] = pd.to_datetime(frame["timestamp"], errors="raise")
+            if frame["timestamp"].dt.tz is None:
+                raise PolicyViolation(f"TXF timestamp lacks timezone: {path.name}")
+            frame["timestamp"] = frame["timestamp"].dt.tz_convert("Asia/Taipei")
+            frame["_source_file"] = path.name
+            frames.append(frame)
         combined = pd.concat(frames, ignore_index=True)
         before = len(combined)
-
-        identity = ["_timestamp_taipei", "_actual_contract_month", *TXF_VALUE_COLUMNS]
-        timestamp_groups = combined.groupby("_timestamp_taipei", sort=False, dropna=False)
-        for timestamp, group in timestamp_groups:
-            if len(group) > 1 and len(group[identity].drop_duplicates()) != 1:
-                raise PolicyViolation(f"Conflicting TXF duplicate timestamp: {timestamp}")
-        combined = combined.drop_duplicates(subset=identity, keep="first")
-        duplicates_removed = before - len(combined)
-        combined = combined.set_index("_timestamp_taipei", drop=False).sort_index()
-
-        approved_start = pd.Timestamp(self.manifest["approved_start"], tz="Asia/Taipei")
-        approved_end = pd.Timestamp(self.manifest["approved_end"], tz="Asia/Taipei")
-        requested_start = pd.Timestamp(start, tz="Asia/Taipei") if start else approved_start
-        requested_end = pd.Timestamp(end, tz="Asia/Taipei") if end else approved_end
-        if requested_start < approved_start or requested_end > approved_end or requested_end < requested_start:
-            raise PolicyViolation("Requested TXF range is outside the approved validation slice")
-        filtered = combined.loc[(combined.index >= requested_start) & (combined.index <= requested_end)].copy()
-        if start is None and end is None and len(filtered) != TXF_EXPECTED_ROWS:
-            raise SnapshotMismatch(
-                f"TXF approved slice row count mismatch: expected {TXF_EXPECTED_ROWS}, got {len(filtered)}"
-            )
-
-        metadata = TXFLoadMetadata(
-            manifest_path=self.manifest_path,
-            verdict=TXF_VERDICT,
-            scope=self.manifest["scope"],
-            source_files=tuple(self.cache_dir / item["file"] for item in self.manifest["partitions"]),
-            rows_before_filter=before,
-            rows_after_filter=len(filtered),
-            exact_duplicates_removed=duplicates_removed,
-            requested_start=start,
-            requested_end=end,
-        )
-        return LoadedTXFBars(filtered, metadata)
+        if before != TXF_EXPECTED_ROWS:
+            raise SnapshotMismatch(f"TXF approved sample row count mismatch: expected {TXF_EXPECTED_ROWS}, got {before}")
+        identity = ["timestamp", "actual_contract_month", "session", *TXF_VALUE_COLUMNS]
+        if combined.duplicated(subset=identity).any():
+            raise PolicyViolation("TXF approved sample contains duplicate bars")
+        if combined.duplicated(subset=["timestamp", "session"]).any():
+            raise PolicyViolation("TXF approved sample contains conflicting timestamps")
+        combined = combined.set_index("timestamp", drop=False).sort_index()
+        if start is not None:
+            combined = combined.loc[combined.index >= pd.to_datetime(start, utc=True).tz_convert("Asia/Taipei")]
+        if end is not None:
+            combined = combined.loc[combined.index <= pd.to_datetime(end, utc=True).tz_convert("Asia/Taipei")]
+        metadata = TXFLoadMetadata(self.run_dir, TXF_PRODUCER_SHA, TXF_VERDICT, self.scope, self.source_files, before, len(combined), start, end)
+        return LoadedTXFBars(combined, metadata)

@@ -18,26 +18,26 @@
 
 ## TXF adapter (v0.2)
 
-- Reads only partitions explicitly listed in `txf_access_manifest.json`.
-- Pins the recorded approved slice to `185` days / `206,938` rows and
-  `SCOPED_GO`; this does not promote all 473 weekly cache files.
-- Verifies each Parquet SHA256 against both the approval manifest and the
-  immutable Fubon JSON sidecar.
+- Pins formal validation run `20261014_213932_404db609cf13`, producer commit
+  `404db609cf136aae050e09f1e7712a7894f6ab6d`, and status `PASS WITH CAVEATS`.
+- Verifies the run metadata, fixed sample-matrix SHA256, final integrity metrics
+  and predeclared query plan before reading data.
+- Reads only 58 `role=primary`, `contract_query=1!`, regular/afterhours files;
+  requires `185` sampled trade dates and exactly `206,938` rows.
 - Requires actual contract month and OHLCV on every row.
 - Consolidates only byte-equivalent logical candles; conflicting duplicate
   timestamps fail closed.
 - Uses `Asia/Taipei`, never fills missing minutes, never infers a roll rule, and
   does not change the existing Adaptive Close convention.
 
-The approval manifest is intentionally not fabricated by this repository. It
-must be produced from the already-reviewed TXF validation slice after its exact
-cache-to-validation mapping is recorded.
+The formal validation run is the approved bounded snapshot. The separate 473
+weekly research-cache partitions remain raw inputs and are not promoted by this
+adapter.
 
 ## Adapter roadmap
 
 - v0.1: IBKR FINAL GATE (`NQ`, `ES`, `TSM`, `SOXX`)
-- v0.2: TXF adapter implemented; formal Drive smoke waits for the approved
-  cache-to-validation manifest
+- v0.2: TXF adapter implemented; formal Drive smoke notebook ready
 - v0.3: Taiwan equity adapter consuming seq 68, quality masks, PIT universe,
   corporate-action and tradability policies
 - v0.4: stable backtest-facing protocol and experiment provenance
