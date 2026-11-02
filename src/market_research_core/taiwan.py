@@ -162,8 +162,14 @@ class TaiwanEquityAdapter:
             ids.append(str(row.partition))
         bars = pd.concat(frames, ignore_index=True)
         bars["symbol"] = symbol
-        if "volume" not in bars.columns and "volume_shares" in bars.columns:
-            bars = bars.rename(columns={"volume_shares": "volume"})
+        if "volume" not in bars.columns:
+            if "volume_shares" in bars.columns:
+                bars = bars.rename(columns={"volume_shares": "volume"})
+                bars["volume_unit"] = bars.get("volume_unit", "share")
+            elif "volume_raw" in bars.columns and "volume_unit" in bars.columns:
+                # Keep the source quantity and its explicit unit together.  Do not
+                # infer a lot-to-share conversion inside the access layer.
+                bars = bars.rename(columns={"volume_raw": "volume"})
         required_ohlcv = {"open", "high", "low", "close", "volume"}
         if not required_ohlcv.issubset(bars.columns):
             raise PolicyViolation(f"Taiwan bar schema missing: {', '.join(sorted(required_ohlcv - set(bars.columns)))}")
