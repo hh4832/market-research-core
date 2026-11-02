@@ -23,7 +23,10 @@ class BacktestEngine:
     """Deterministic long-only SMA integration probe, not a strategy claim."""
 
     def run_sma(self, loaded: UnifiedBars, assumptions: BacktestAssumptions = BacktestAssumptions()) -> BacktestResult:
-        frame = loaded.frame.copy().sort_values("timestamp").reset_index(drop=True)
+        # Adapters may intentionally retain timestamp both as a column and as
+        # their native index.  Normalize the row index before column sorting so
+        # pandas cannot interpret the label as two different sort keys.
+        frame = loaded.frame.copy().reset_index(drop=True).sort_values("timestamp").reset_index(drop=True)
         missing = sorted(REQUIRED - set(frame.columns))
         if missing:
             raise BacktestRejected(f"Backtest data contract columns missing: {', '.join(missing)}")
