@@ -45,3 +45,11 @@ returns provenance. It never forward-fills, interpolates, or synthesizes bars.
 TXF and Taiwan equities will be added as separate adapters after this common
 contract is stable. Existing historical gates will be consumed, not repeated.
 
+## Colab Drive smoke test
+
+Open [`notebooks/colab_drive_smoke_test.ipynb`](notebooks/colab_drive_smoke_test.ipynb)
+in Colab and run all cells. It mounts Drive read-only from the application's
+perspective, locates the pinned FULL run, checks TSM/SOXX, then reads all explicit
+NQ/ES quarterly contracts and verifies aggregate published row counts. It never
+constructs a continuous future.
+
