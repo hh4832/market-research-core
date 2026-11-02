@@ -9,7 +9,10 @@ from .errors import PolicyViolation, SnapshotMismatch
 
 TXF_RUN_NAME = "20261014_213932_404db609cf13"
 TXF_PRODUCER_SHA = "404db609cf136aae050e09f1e7712a7894f6ab6d"
+# Producer-computed canonical hash recorded in run_info/validation evidence.
 TXF_SAMPLE_MATRIX_SHA256 = "13b24c1defe3b58eba7092adfe4cf66a9e5f067b7862c8aff4c603d4962c4c9f"
+# Raw-byte hash of diagnostics/predeclared_sample_matrix.csv in the pinned run.
+TXF_SAMPLE_MATRIX_FILE_SHA256 = "a1d8ac2de0265aea2fa826ba2478d6b9fbd186fc76299365433325ce0ac0689f"
 TXF_VERDICT = "PASS WITH CAVEATS"
 TXF_EXPECTED_ROWS = 206_938
 TXF_EXPECTED_DAYS = 185
@@ -86,7 +89,7 @@ class TXFAdapter:
             if info.get(key) != value:
                 raise SnapshotMismatch(f"TXF run_info mismatch for {key}: {info.get(key)!r}")
         matrix = self.run_dir / "diagnostics" / "predeclared_sample_matrix.csv"
-        if not matrix.is_file() or _sha256(matrix) != TXF_SAMPLE_MATRIX_SHA256:
+        if not matrix.is_file() or _sha256(matrix) != TXF_SAMPLE_MATRIX_FILE_SHA256:
             raise SnapshotMismatch("TXF sample matrix checksum mismatch")
         metrics_path = self.run_dir / "diagnostics" / "final_historical_integrity_summary.csv"
         if not metrics_path.is_file():
