@@ -1,5 +1,8 @@
-from dataclasses import dataclass
+from __future__ import annotations
+
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any, Literal
 
 import pandas as pd
 
@@ -40,3 +43,59 @@ class LoadedBars:
     frame: pd.DataFrame
     metadata: LoadMetadata
 
+
+UsageScope = Literal["RESEARCH_ONLY", "BACKTEST", "ROBUSTNESS_ONLY"]
+
+
+@dataclass(frozen=True)
+class UnifiedProvenance:
+    market: str
+    symbol: str
+    snapshot_id: str
+    producer_commit_sha: str
+    data_verdict: str
+    source_files: tuple[str, ...]
+    partition_ids: tuple[str, ...] = ()
+    exclusion_rules: tuple[str, ...] = ()
+    quality_mask_version: str | None = None
+    permitted_usage_scope: UsageScope = "RESEARCH_ONLY"
+    unavailable_intervals: tuple[str, ...] = ()
+    assumptions: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class UnifiedBars:
+    frame: pd.DataFrame
+    provenance: UnifiedProvenance
+    native_metadata: Any = None
+
+
+@dataclass(frozen=True)
+class MarketDataConfig:
+    ibkr_run_dir: Path | None = None
+    txf_run_dir: Path | None = None
+    taiwan_lake_root: Path | None = None
+
+
+@dataclass(frozen=True)
+class BacktestAssumptions:
+    initial_cash: float = 1_000_000.0
+    fast_window: int = 5
+    slow_window: int = 20
+    fee_rate: float = 0.001425
+    sell_tax_rate: float = 0.0
+    slippage_bps: float = 1.0
+    unit_size: float = 1.0
+    contract_multiplier: float | None = None
+    performance_claim: bool = False
+
+
+@dataclass(frozen=True)
+class BacktestResult:
+    trades: pd.DataFrame
+    equity_curve: pd.DataFrame
+    total_return: float
+    max_drawdown: float
+    trade_count: int
+    rejections: pd.DataFrame
+    provenance: dict[str, Any] = field(default_factory=dict)
