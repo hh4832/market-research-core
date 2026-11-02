@@ -42,8 +42,10 @@ returns provenance. It never forward-fills, interpolates, or synthesizes bars.
 - `IBKR-market-data-cleaning-pipeline`: acquisition, recovery, QC, FINAL GATE
 - `market-research-core`: read-only adapters, policy enforcement, backtests, agents
 
-TXF and Taiwan equities will be added as separate adapters after this common
-contract is stable. Existing historical gates will be consumed, not repeated.
+TXF is available through a separate fail-closed `TXFAdapter`. It consumes an
+explicit approval manifest for the recorded 185-day / 206,938-row validation
+slice; it does not treat all 473 weekly raw-cache partitions as validated.
+Existing historical gates are consumed, not repeated.
 
 ## Colab Drive smoke test
 
@@ -52,4 +54,9 @@ in Colab and run all cells. It mounts Drive read-only from the application's
 perspective, locates the pinned FULL run, checks TSM/SOXX, then reads all explicit
 NQ/ES quarterly contracts and verifies aggregate published row counts. It never
 constructs a continuous future.
+
+TXF has a separate [Drive smoke notebook](notebooks/colab_txf_drive_smoke_test.ipynb).
+It first confirms the raw-cache inventory, then requires the approved
+cache-to-validation manifest. Until that manifest exists, the notebook stops
+with `STOPPED_FAIL_CLOSED` and does not substitute all 473 partitions.
 
