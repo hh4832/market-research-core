@@ -48,6 +48,20 @@ def _truth(value) -> bool:
     return str(value).upper() in {"TRUE", "1"}
 
 
+def _single_pin(value):
+    """Normalize FINAL GATE scalar pins without weakening exact matching."""
+    if isinstance(value, list):
+        if len(value) != 1:
+            raise SnapshotMismatch("Taiwan FINAL GATE pin must contain exactly one value")
+        return value[0]
+    return value
+
+
+def _directory_pin(value) -> str:
+    """Accept the manifest's absolute Drive path while comparing its pinned leaf."""
+    return Path(str(_single_pin(value))).name
+
+
 def _manifest_hashes(directory: Path) -> dict[str, str]:
     path = directory / "manifest.json"
     if not path.is_file():
@@ -96,13 +110,18 @@ class TaiwanEquityAdapter:
             ("fubon_5m", "version_dir"): TW_FUBON_VERSION,
             ("quality_mask", "sha256"): TW_QUALITY_SHA256,
             ("quality_mask", "evidence_version"): TW_EVIDENCE_VERSION,
-            ("corporate_actions_v2", "dir"): str(TW_PINNED_PATHS["corporate_actions"]).split("/")[-1],
-            ("trading_rules", "dir"): str(TW_PINNED_PATHS["trading_rules"]).split("/")[-1],
-            ("universe_pit", "dir"): str(TW_PINNED_PATHS["universe"]).split("/")[-1],
         }
         for (section, key), value in expected.items():
-            if pins.get(section, {}).get(key) != value:
+            if _single_pin(pins.get(section, {}).get(key)) != value:
                 raise SnapshotMismatch(f"Taiwan pin mismatch: {section}.{key}")
+        expected_dirs = {
+            "corporate_actions_v2": TW_PINNED_PATHS["corporate_actions"].name,
+            "trading_rules": TW_PINNED_PATHS["trading_rules"].name,
+            "universe_pit": TW_PINNED_PATHS["universe"].name,
+        }
+        for section, expected_dir in expected_dirs.items():
+            if _directory_pin(pins.get(section, {}).get("dir")) != expected_dir:
+                raise SnapshotMismatch(f"Taiwan pin mismatch: {section}.dir")
         pointer = p.data_root / "fubon_stock_5m/_manifest/published.json"
         ptr = json.loads(pointer.read_text(encoding="utf-8")) if pointer.is_file() else {}
         if ptr.get("seq") != TW_FUBON_SEQ or ptr.get("version_dir") != TW_FUBON_VERSION:
