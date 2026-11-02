@@ -128,6 +128,7 @@ def sample_unified() -> UnifiedBars:
     frame = pd.DataFrame({"timestamp": ts, "open": close, "high": close, "low": close, "close": close,
         "volume": 100, "available_at": ts + pd.Timedelta(minutes=1), "data_exists": True,
         "research_eligible": True, "backtest_eligible": True, "execution_eligible": True})
+    frame = frame.set_index("timestamp", drop=False)
     return UnifiedBars(frame, UnifiedProvenance("IBKR", "TSM", "run", "sha", "GO", ("x",), permitted_usage_scope="BACKTEST"))
 
 
