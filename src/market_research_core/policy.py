@@ -8,17 +8,17 @@ PINNED_SNAPSHOT = SnapshotIdentity(
 
 INSTRUMENTS = {
     "NQ": InstrumentPolicy(
-        "NQ", "SCOPED_GO", 869_291, "nq_normalized.parquet",
+        "NQ", "SCOPED_GO", 869_291, "normalized_futures/NQ/{contract}.parquet",
         "nq_unresolved_exclusions.csv", True,
     ),
     "ES": InstrumentPolicy(
-        "ES", "SCOPED_GO", 869_313, "es_normalized.parquet",
+        "ES", "SCOPED_GO", 869_313, "normalized_futures/ES/{contract}.parquet",
         "es_unresolved_exclusions.csv", True,
     ),
     "TSM": InstrumentPolicy("TSM", "GO", 2_193_372, "tsm_normalized.parquet"),
     "SOXX": InstrumentPolicy(
         "SOXX", "SCOPED_GO", 2_065_882, "soxx_normalized.parquet",
-        "soxx_rth_missing_intervals.csv",
+        "soxx_rth_missing_intervals.csv", False, True,
     ),
 }
 

@@ -16,9 +16,10 @@ class InstrumentPolicy:
     symbol: str
     verdict: str
     expected_rows: int
-    normalized_filename: str
+    normalized_pattern: str
     exclusions_filename: str | None = None
     quarterly_contracts_only: bool = False
+    exclusion_end_inclusive: bool = False
 
 
 @dataclass(frozen=True)

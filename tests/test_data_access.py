@@ -33,30 +33,58 @@ def test_tsm_loads_without_synthesis(tmp_path: Path):
 
 def test_scoped_go_exclusion_is_mandatory(tmp_path: Path):
     root = make_run(tmp_path)
+    (root / "normalized_futures" / "NQ").mkdir(parents=True)
     pd.DataFrame(
         {"timestamp": ["2020-01-01T14:30:00Z", "2020-01-01T14:31:00Z"], "close": [1, 2]}
-    ).to_parquet(root / "nq_normalized.parquet", index=False)
+    ).to_parquet(root / "normalized_futures" / "NQ" / "NQH5.parquet", index=False)
     pd.DataFrame(
-        {"start": ["2020-01-01T14:30:00Z"], "end": ["2020-01-01T14:30:00Z"]}
+        {
+            "contract": ["NQH5"],
+            "start_utc": ["2020-01-01T14:30:00Z"],
+            "end_utc": ["2020-01-01T14:31:00Z"],
+        }
     ).to_csv(root / "nq_unresolved_exclusions.csv", index=False)
-    loaded = MarketDataClient.from_run_dir(root).load("NQ")
+    loaded = MarketDataClient.from_run_dir(root).load("NQ", contract="NQH5")
     assert list(loaded.frame["close"]) == [2]
     assert loaded.metadata.excluded_rows == 1
 
 
 def test_missing_exclusion_file_fails_closed(tmp_path: Path):
     root = make_run(tmp_path)
+    (root / "normalized_futures" / "NQ").mkdir(parents=True)
     pd.DataFrame({"timestamp": ["2020-01-01T14:30:00Z"]}).to_parquet(
-        root / "nq_normalized.parquet", index=False
+        root / "normalized_futures" / "NQ" / "NQH5.parquet", index=False
     )
     with pytest.raises(PolicyViolation, match="Expected exactly one"):
-        MarketDataClient.from_run_dir(root).load("NQ")
+        MarketDataClient.from_run_dir(root).load("NQ", contract="NQH5")
 
 
 def test_continuous_future_inference_is_forbidden(tmp_path: Path):
     root = make_run(tmp_path)
     with pytest.raises(PolicyViolation, match="forbidden"):
         MarketDataClient.from_run_dir(root).load("ES", continuous=True)
+
+
+def test_futures_contract_is_required(tmp_path: Path):
+    root = make_run(tmp_path)
+    with pytest.raises(PolicyViolation, match="explicit quarterly contract"):
+        MarketDataClient.from_run_dir(root).load("NQ")
+
+
+def test_soxx_real_exclusion_columns_are_inclusive(tmp_path: Path):
+    root = make_run(tmp_path)
+    pd.DataFrame(
+        {"timestamp": ["2017-01-05T14:30:00Z", "2017-01-05T15:56:00Z", "2017-01-05T15:57:00Z"]}
+    ).to_parquet(root / "soxx_normalized.parquet", index=False)
+    pd.DataFrame(
+        {
+            "first_missing_utc": ["2017-01-05T14:30:00Z"],
+            "last_missing_utc": ["2017-01-05T15:56:00Z"],
+        }
+    ).to_csv(root / "soxx_rth_missing_intervals.csv", index=False)
+    loaded = MarketDataClient.from_run_dir(root).load("SOXX")
+    assert len(loaded.frame) == 1
+    assert loaded.metadata.excluded_rows == 2
 
 
 def test_wrong_snapshot_name_is_rejected(tmp_path: Path):

@@ -7,8 +7,14 @@ from .models import InstrumentPolicy
 
 
 TIMESTAMP_CANDIDATES = ("timestamp", "datetime", "date", "time")
-EXCLUSION_START_CANDIDATES = ("start", "start_ts", "start_time", "window_start", "missing_start")
-EXCLUSION_END_CANDIDATES = ("end", "end_ts", "end_time", "window_end", "missing_end")
+EXCLUSION_START_CANDIDATES = (
+    "start", "start_ts", "start_time", "start_utc", "window_start",
+    "missing_start", "first_missing_utc",
+)
+EXCLUSION_END_CANDIDATES = (
+    "end", "end_ts", "end_time", "end_utc", "window_end",
+    "missing_end", "last_missing_utc",
+)
 
 
 def _first_column(frame: pd.DataFrame, candidates: tuple[str, ...]) -> str:
@@ -19,12 +25,23 @@ def _first_column(frame: pd.DataFrame, candidates: tuple[str, ...]) -> str:
     raise PolicyViolation(f"Expected one of columns: {', '.join(candidates)}")
 
 
-def normalized_path(root: Path, policy: InstrumentPolicy) -> Path:
-    direct = root / policy.normalized_filename
-    matches = [direct] if direct.is_file() else list(root.rglob(policy.normalized_filename))
+def normalized_path(root: Path, policy: InstrumentPolicy, contract: str | None) -> Path:
+    if "{contract}" in policy.normalized_pattern:
+        if not contract:
+            raise PolicyViolation(f"{policy.symbol} requires an explicit quarterly contract")
+        normalized_contract = contract.upper().strip()
+        if not normalized_contract.startswith(policy.symbol):
+            raise PolicyViolation(f"Contract {contract} does not belong to {policy.symbol}")
+        pattern = policy.normalized_pattern.format(contract=normalized_contract)
+    else:
+        if contract:
+            raise PolicyViolation(f"{policy.symbol} does not accept a futures contract")
+        pattern = policy.normalized_pattern
+    direct = root / pattern
+    matches = [direct] if direct.is_file() else list(root.rglob(Path(pattern).name))
     if len(matches) != 1:
         raise PolicyViolation(
-            f"Expected exactly one {policy.normalized_filename}; found {len(matches)}"
+            f"Expected exactly one {pattern}; found {len(matches)}"
         )
     return matches[0]
 
@@ -40,7 +57,12 @@ def read_bars(path: Path) -> pd.DataFrame:
     return frame
 
 
-def apply_exclusions(frame: pd.DataFrame, root: Path, policy: InstrumentPolicy) -> tuple[pd.DataFrame, int]:
+def apply_exclusions(
+    frame: pd.DataFrame,
+    root: Path,
+    policy: InstrumentPolicy,
+    contract: str | None,
+) -> tuple[pd.DataFrame, int]:
     if not policy.exclusions_filename:
         return frame, 0
     matches = list(root.rglob(policy.exclusions_filename))
@@ -49,6 +71,10 @@ def apply_exclusions(frame: pd.DataFrame, root: Path, policy: InstrumentPolicy) 
             f"Expected exactly one {policy.exclusions_filename}; found {len(matches)}"
         )
     exclusions = pd.read_csv(matches[0])
+    if contract and "contract" in exclusions.columns:
+        exclusions = exclusions.loc[
+            exclusions["contract"].astype(str).str.upper() == contract.upper()
+        ]
     if exclusions.empty:
         return frame, 0
     start_col = _first_column(exclusions, EXCLUSION_START_CANDIDATES)
@@ -59,7 +85,11 @@ def apply_exclusions(frame: pd.DataFrame, root: Path, policy: InstrumentPolicy) 
         end_ts = pd.to_datetime(end, utc=True, errors="raise")
         if end_ts < start_ts:
             raise PolicyViolation("Exclusion interval ends before it starts")
-        keep &= ~((frame.index >= start_ts) & (frame.index <= end_ts))
+        if policy.exclusion_end_inclusive:
+            in_window = (frame.index >= start_ts) & (frame.index <= end_ts)
+        else:
+            in_window = (frame.index >= start_ts) & (frame.index < end_ts)
+        keep &= ~in_window
     filtered = frame.loc[keep.to_numpy()].copy()
     return filtered, len(frame) - len(filtered)
 

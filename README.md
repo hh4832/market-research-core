@@ -28,6 +28,8 @@ client = MarketDataClient.from_run_dir(
     "/path/to/20261101_205431_06359faf7ef4_IBKR_FINAL_GATE_FULL"
 )
 bars = client.load("TSM", start="2020-01-01", end="2020-12-31")
+# Futures always require an explicit quarterly contract:
+nq = client.load("NQ", contract="NQH5")
 print(bars.metadata)
 ```
 

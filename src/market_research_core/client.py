@@ -24,6 +24,7 @@ class MarketDataClient:
         *,
         start: str | None = None,
         end: str | None = None,
+        contract: str | None = None,
         continuous: bool = False,
     ) -> LoadedBars:
         symbol = instrument.upper().strip()
@@ -35,10 +36,10 @@ class MarketDataClient:
         if continuous and policy.quarterly_contracts_only:
             raise PolicyViolation(f"{symbol} continuous-contract inference is forbidden")
 
-        path = normalized_path(self.run_dir, policy)
+        path = normalized_path(self.run_dir, policy, contract)
         frame = read_bars(path)
         before = len(frame)
-        frame, excluded = apply_exclusions(frame, self.run_dir, policy)
+        frame, excluded = apply_exclusions(frame, self.run_dir, policy, contract)
         if start is not None:
             frame = frame.loc[frame.index >= pd.to_datetime(start, utc=True)]
         if end is not None:
