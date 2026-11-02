@@ -18,6 +18,11 @@
 
 ## TXF adapter (v0.2)
 
+The formal run records a producer-computed canonical sample-matrix hash in its
+run metadata. The adapter verifies that value separately from the raw-byte
+SHA-256 of `diagnostics/predeclared_sample_matrix.csv`; the two hashes are not
+interchangeable.
+
 - Pins formal validation run `20261014_213932_404db609cf13`, producer commit
   `404db609cf136aae050e09f1e7712a7894f6ab6d`, and status `PASS WITH CAVEATS`.
 - Verifies the run metadata, fixed sample-matrix SHA256, final integrity metrics
