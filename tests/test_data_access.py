@@ -31,6 +31,15 @@ def test_tsm_loads_without_synthesis(tmp_path: Path):
     assert loaded.metadata.excluded_rows == 0
 
 
+def test_final_gate_timestamp_utc_schema_is_supported(tmp_path: Path):
+    root = make_run(tmp_path)
+    pd.DataFrame({"timestamp_utc": ["2020-01-01T14:30:00Z"], "close": [10.0]}).to_parquet(
+        root / "tsm_normalized.parquet", index=False
+    )
+    loaded = MarketDataClient.from_run_dir(root).load("TSM")
+    assert str(loaded.frame.index.dtype) == "datetime64[ns, UTC]"
+
+
 def test_scoped_go_exclusion_is_mandatory(tmp_path: Path):
     root = make_run(tmp_path)
     (root / "normalized_futures" / "NQ").mkdir(parents=True)

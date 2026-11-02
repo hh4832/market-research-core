@@ -6,7 +6,7 @@ from .errors import PolicyViolation
 from .models import InstrumentPolicy
 
 
-TIMESTAMP_CANDIDATES = ("timestamp", "datetime", "date", "time")
+TIMESTAMP_CANDIDATES = ("timestamp_utc", "timestamp", "datetime", "date", "time")
 EXCLUSION_START_CANDIDATES = (
     "start", "start_ts", "start_time", "start_utc", "window_start",
     "missing_start", "first_missing_utc",
