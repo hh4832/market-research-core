@@ -101,7 +101,7 @@ def test_fills_and_position_ledger_follow_execution_time_not_order_creation_time
    signal_available_at=pd.Timestamp("2024-01-02 09:01",tz="Asia/Taipei"),
    order_time=pd.Timestamp("2024-01-02 09:01",tz="Asia/Taipei"))
  r=ExecutionEngine().run(f,[delayed_buy,earlier_fill_sell],cost_profile=profile(),
-   config(permitted_usage_scope="RESEARCH_ONLY"))
+   config=config(permitted_usage_scope="RESEARCH_ONLY"))
  fill_times=list(r.fills.exec_ts)
  assert fill_times==sorted(fill_times)
  assert all(pd.Timestamp(trip.entry_ts)<=pd.Timestamp(trip.exit_ts) for trip in r.round_trips.itertuples())
