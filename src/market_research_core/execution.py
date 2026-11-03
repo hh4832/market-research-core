@@ -159,16 +159,20 @@ class ExecutionEngine:
             raise ValueError("formal execution is blocked for UNKNOWN session rows")
 
         orders = sorted(list(orders), key=lambda o: (_ts(o.order_time, config.timestamp_timezone), o.order_id or ""))
+        orders_input = list(orders)
         fills: list[dict[str, Any]] = []
         rejects: list[dict[str, Any]] = []
         trips: list[dict[str, Any]] = []
         invalid: list[dict[str, Any]] = []
         lots: dict[tuple[str, str], list[dict[str, Any]]] = {}
         cash = float(config.initial_cash)
-        order_outcomes: dict[str, str] = {}
         target_positions: dict[tuple[str, str, str], float] = {}
         assumptions = ["FIFO lot matching", "orders execute at bar open for market orders", "end-of-data positions remain open"]
 
+        # Build each order's candidate bar set first, then advance all candidate
+        # orders on the shared bar_start timeline. State changes happen only at
+        # the bar where a fill occurs, never in order-creation order.
+        records: list[dict[str, Any]] = []
         for order_idx, order in enumerate(orders):
             oid = order.order_id or f"order-{order_idx + 1}"
             signal_time = _ts(order.signal_time, config.timestamp_timezone)
@@ -176,7 +180,6 @@ class ExecutionEngine:
             order_time = _ts(order.order_time, config.timestamp_timezone)
             if available < signal_time or order_time < available:
                 rejects.append({"order_id": oid, "reason": "PIT_VIOLATION", "detail": "signal_available_at/order_time precedes prior information"})
-                order_outcomes[oid] = "REJECTED"
                 continue
             if order.market in ("TXF", "IBKR_FUTURES") and config.initial_margin_per_contract is None:
                 raise ValueError("TXF execution requires explicit initial_margin_per_contract")
@@ -185,25 +188,7 @@ class ExecutionEngine:
             if order.market not in ("TXF", "IBKR_FUTURES") and cost_profile.instrument_type != "EQUITY":
                 raise ValueError("equity market requires an EQUITY CostProfile")
 
-            key = (order.symbol, order.contract)
-            target_key = None
-            if order.target_position is not None:
-                target_key = (order.strategy_id, order.symbol, order.contract)
-                current_target = target_positions.get(target_key, 0.0)
-                delta = order.target_position - current_target
-                if abs(delta) < 1e-12:
-                    order_outcomes[oid] = "NOOP"
-                    continue
-                side = "BUY" if delta > 0 else "SELL"
-                qty = abs(delta)
-            else:
-                side, qty = order.side, float(order.quantity)
-            if side != order.side:
-                rejects.append({"order_id": oid, "reason": "TARGET_SIDE_MISMATCH", "detail": f"target requires {side}"})
-                order_outcomes[oid] = "REJECTED"
-                continue
-
-            candidates = frame[
+            matching = frame[
                 (frame["symbol"] == order.symbol)
                 & (frame["market"] == order.market)
                 & (frame["contract"] == order.contract)
@@ -212,142 +197,188 @@ class ExecutionEngine:
                 & (frame["bar_end"] > signal_time)
             ]
             if not config.same_timestamp_open_assumption:
-                candidates = candidates[candidates["bar_start"] > max(available, order_time)]
-            chosen = None
-            reason = "UNFILLED_AT_END_OF_DATA"
+                matching = matching[matching["bar_start"] > max(available, order_time)]
             if order.time_in_force == "NEXT_BAR":
-                candidates = candidates.iloc[:1]
-            elif not candidates.empty:
-                first_session_open = candidates.iloc[0]["session_open"]
-                candidates = candidates[candidates["session_open"] == first_session_open]
-            for _, bar in candidates.iterrows():
+                matching = matching.iloc[:1]
+            elif not matching.empty:
+                first_session_open = matching.iloc[0]["session_open"]
+                matching = matching[matching["session_open"] == first_session_open]
+
+            records.append({
+                "idx": order_idx, "oid": oid, "order": order,
+                "signal_time": signal_time, "available": available, "order_time": order_time,
+                "target_key": (order.strategy_id, order.symbol, order.contract) if order.target_position is not None else None,
+                "candidate_rows": {pd.Timestamp(row["bar_start"]): row for _, row in matching.iterrows()},
+                "last_reason": "UNFILLED_AT_END_OF_DATA", "done": False,
+            })
+
+        bars_by_time: dict[pd.Timestamp, dict[tuple[str, str, str], pd.Series]] = {}
+        for _, bar in frame.iterrows():
+            ts = pd.Timestamp(bar["bar_start"])
+            bars_by_time.setdefault(ts, {})[(bar["symbol"], bar["market"], bar["contract"])] = bar
+
+        for event_ts in sorted(bars_by_time):
+            rows_at_time = bars_by_time[event_ts]
+            live = sorted(
+                (record for record in records
+                 if not record["done"] and record["order_time"] <= event_ts
+                 and event_ts in record["candidate_rows"]),
+                key=lambda record: (record["order_time"], record["order"].order_id or ""),
+            )
+            for record in live:
+                order = record["order"]
+                oid = record["oid"]
+                bar = record["candidate_rows"][event_ts]
+                key = (order.symbol, order.contract)
+                target_key = record["target_key"]
+                if target_key is not None:
+                    current_target = target_positions.get(target_key, 0.0)
+                    delta = float(order.target_position) - current_target
+                    if abs(delta) < 1e-12:
+                        record["done"] = True
+                        continue
+                    side = "BUY" if delta > 0 else "SELL"
+                    qty = abs(delta)
+                else:
+                    side, qty = order.side, float(order.quantity)
+                if side != order.side:
+                    rejects.append({"order_id": oid, "reason": "TARGET_SIDE_MISMATCH", "detail": f"target requires {side}"})
+                    record["done"] = True
+                    continue
+
+                reason: str | None = None
                 if order.time_in_force == "DAY" and bar["bar_start"] >= bar["session_close"]:
                     reason = "ORDER_EXPIRED"
-                    break
-                if bar["bar_start"] < bar["session_open"] or bar["bar_start"] >= bar["session_close"]:
+                elif bar["bar_start"] < bar["session_open"] or bar["bar_start"] >= bar["session_close"]:
                     reason = "OUTSIDE_SESSION"
-                    continue
-                if not bool(bar["data_exists"]) or not bool(bar["backtest_eligible"]):
+                elif not bool(bar["data_exists"]) or not bool(bar["backtest_eligible"]):
                     reason = "BAR_NOT_ELIGIBLE"
-                    continue
-                if float(bar["volume"]) <= 0:
+                elif float(bar["volume"]) <= 0:
                     reason = "ZERO_VOLUME_BAR"
+                else:
+                    eligible_col = "buy_execution_eligible" if side == "BUY" else "sell_execution_eligible"
+                    if not bool(bar[eligible_col]):
+                        reason_col = f"{side.lower()}_execution_rejection_reason"
+                        reason_value = bar.get(reason_col, bar["execution_rejection_reason"])
+                        reason = str(reason_value) if pd.notna(reason_value) and str(reason_value) else f"{side}_NOT_ELIGIBLE"
+                    else:
+                        exclusion = _in_window(bar["bar_start"], config.exclusion_windows, config.timestamp_timezone)
+                        if exclusion:
+                            reason = "BAR_IN_EXCLUSION_WINDOW"
+                        elif order.order_type == "LIMIT" and (
+                            (side == "BUY" and float(bar["low"]) > float(order.limit_price))
+                            or (side == "SELL" and float(bar["high"]) < float(order.limit_price))
+                        ):
+                            reason = "LIMIT_NOT_TOUCHED"
+
+                if reason is not None:
+                    record["last_reason"] = reason
+                    # NEXT_BAR has a single candidate; DAY remains live through
+                    # the candidates in its selected session, matching v1's
+                    # existing behavior until the dedicated TIF correction.
+                    if order.time_in_force == "NEXT_BAR" or reason in ("ORDER_EXPIRED", "BAR_IN_EXCLUSION_WINDOW"):
+                        rejects.append({"order_id": oid, "bar_ts": bar["bar_start"], "reason": reason,
+                                        "detail": "no eligible execution bar within TIF"})
+                        record["done"] = True
                     continue
-                eligible_col = "buy_execution_eligible" if side == "BUY" else "sell_execution_eligible"
-                if not bool(bar[eligible_col]):
-                    reason_col = f"{side.lower()}_execution_rejection_reason"
-                    reason_value = bar.get(reason_col, bar["execution_rejection_reason"])
-                    reason = str(reason_value) if pd.notna(reason_value) and str(reason_value) else f"{side}_NOT_ELIGIBLE"
-                    continue
-                exclusion = _in_window(bar["bar_start"], config.exclusion_windows, config.timestamp_timezone)
-                if exclusion:
-                    reason = "BAR_IN_EXCLUSION_WINDOW"
-                    break
+
                 if order.order_type == "LIMIT":
-                    if side == "BUY" and float(bar["low"]) > float(order.limit_price):
-                        reason = "LIMIT_NOT_TOUCHED"
-                        continue
-                    if side == "SELL" and float(bar["high"]) < float(order.limit_price):
-                        reason = "LIMIT_NOT_TOUCHED"
-                        continue
                     raw_price = min(float(bar["open"]), float(order.limit_price)) if side == "BUY" else max(float(bar["open"]), float(order.limit_price))
                 else:
                     raw_price = float(bar["open"])
-                chosen = (bar, raw_price)
-                break
-            if chosen is None:
-                rejects.append({"order_id": oid, "reason": reason, "detail": "no eligible execution bar within TIF"})
-                order_outcomes[oid] = "REJECTED" if reason not in ("UNFILLED_AT_END_OF_DATA", "ORDER_EXPIRED") else reason
-                continue
-
-            bar, raw_price = chosen
-            fill_price = adverse_fill_price(raw_price, side, cost_profile, config.cost_multiplier)
-            if order.order_type == "LIMIT":
-                fill_price = min(fill_price, float(order.limit_price)) if side == "BUY" else max(fill_price, float(order.limit_price))
-            fee, tax = calculate_costs(fill_price, qty, side, cost_profile)
-            fee, tax = _money(fee * config.cost_multiplier), _money(tax * config.cost_multiplier)
-            signed_delta = qty if side == "BUY" else -qty
-            current_net = sum(lot["signed_qty"] for lot in lots.get(key, []))
-            resulting_net = current_net + signed_delta
-            multiplier = cost_profile.contract_multiplier if cost_profile.instrument_type == "FUTURES" else 1.0
-            if cost_profile.instrument_type == "FUTURES" and config.initial_margin_per_contract is not None:
-                required_margin = abs(resulting_net) * config.initial_margin_per_contract
-                if required_margin > cash + 1e-9:
-                    rejects.append({"order_id": oid, "reason": "INSUFFICIENT_MARGIN",
-                                    "detail": f"required={required_margin:.2f}, available={cash:.2f}"})
-                    order_outcomes[oid] = "REJECTED"
+                fill_price = adverse_fill_price(raw_price, side, cost_profile, config.cost_multiplier)
+                if order.order_type == "LIMIT":
+                    fill_price = min(fill_price, float(order.limit_price)) if side == "BUY" else max(fill_price, float(order.limit_price))
+                fee, tax = calculate_costs(fill_price, qty, side, cost_profile)
+                fee, tax = _money(fee * config.cost_multiplier), _money(tax * config.cost_multiplier)
+                signed_delta = qty if side == "BUY" else -qty
+                current_net = sum(lot["signed_qty"] for lot in lots.get(key, []))
+                resulting_net = current_net + signed_delta
+                multiplier = cost_profile.contract_multiplier if cost_profile.instrument_type == "FUTURES" else 1.0
+                if cost_profile.instrument_type == "FUTURES" and config.initial_margin_per_contract is not None:
+                    required_margin = abs(resulting_net) * config.initial_margin_per_contract
+                    if required_margin > cash + 1e-9:
+                        rejects.append({"order_id": oid, "reason": "INSUFFICIENT_MARGIN",
+                                        "detail": f"required={required_margin:.2f}, available={cash:.2f}"})
+                        record["done"] = True
+                        continue
+                if config.max_gross_notional is not None and abs(resulting_net * fill_price * multiplier) > config.max_gross_notional:
+                    rejects.append({"order_id": oid, "reason": "RISK_LIMIT",
+                                    "detail": f"gross_notional={abs(resulting_net * fill_price * multiplier):.2f}"})
+                    record["done"] = True
                     continue
-            if config.max_gross_notional is not None and abs(resulting_net * fill_price * multiplier) > config.max_gross_notional:
-                rejects.append({"order_id": oid, "reason": "RISK_LIMIT",
-                                "detail": f"gross_notional={abs(resulting_net * fill_price * multiplier):.2f}"})
-                order_outcomes[oid] = "REJECTED"
-                continue
-            fill = {
-                "order_id": oid, "symbol": order.symbol, "market": order.market,
-                "contract": order.contract, "exec_ts": bar["bar_start"], "side": side,
-                "qty": qty, "fill_price": fill_price, "fee": fee, "tax": tax,
-                "strategy_id": order.strategy_id, "experiment_id": order.experiment_id,
-                "session": bar["session"], "execution_assumption": "SAME_TIMESTAMP_BAR_OPEN" if bar["bar_start"] == available else "NEXT_ELIGIBLE_BAR_OPEN",
-            }
-            fills.append(fill)
-            order_outcomes[oid] = "FILLED"
-            if target_key is not None:
-                target_positions[target_key] = float(order.target_position)
-
-            multiplier = cost_profile.contract_multiplier if cost_profile.instrument_type == "FUTURES" else 1.0
-            signed_qty = qty if side == "BUY" else -qty
-            lots.setdefault(key, [])
-            remaining = qty
-            # Consume opposite lots FIFO; each pair closes only within the same contract.
-            while remaining > 1e-12 and lots[key] and lots[key][0]["signed_qty"] * signed_qty < 0:
-                lot = lots[key][0]
-                matched = min(remaining, abs(lot["signed_qty"]))
-                gross = (fill_price - lot["entry_price"]) * math.copysign(matched, lot["signed_qty"]) * multiplier
-                entry_fee_alloc = lot["fee_remaining"] * matched / abs(lot["signed_qty"])
-                exit_fee_alloc = fee * matched / qty
-                entry_tax_alloc = lot["tax_remaining"] * matched / abs(lot["signed_qty"])
-                exit_tax_alloc = tax * matched / qty
-                net = gross - entry_fee_alloc - exit_fee_alloc - entry_tax_alloc - exit_tax_alloc
-                if cost_profile.instrument_type == "FUTURES":
-                    cash += gross - exit_fee_alloc - exit_tax_alloc
-                else:
-                    cash += math.copysign(fill_price * matched, lot["signed_qty"])
-                start_ts = lot["entry_ts"]
-                end_ts = bar["bar_start"]
-                exclusion = next((label for start, end, label in config.exclusion_windows if _ts(start, config.timestamp_timezone) < end_ts and _ts(end, config.timestamp_timezone) > start_ts), None)
-                trip = {
-                    "symbol": order.symbol, "market": order.market, "contract": order.contract,
-                    "entry_ts": start_ts, "exit_ts": end_ts, "side": "LONG" if lot["signed_qty"] > 0 else "SHORT",
-                    "qty": matched, "entry_price": lot["entry_price"], "exit_price": fill_price,
-                    "gross_pnl": _money(gross), "net_pnl": _money(net), "invalidated": bool(exclusion),
-                    "invalidation_reason": exclusion, "strategy_id": lot["strategy_id"], "experiment_id": lot["experiment_id"],
-                }
-                (invalid if exclusion else trips).append(trip)
-                lot["signed_qty"] -= math.copysign(matched, lot["signed_qty"])
-                lot["fee_remaining"] -= entry_fee_alloc
-                lot["tax_remaining"] -= entry_tax_alloc
-                remaining -= matched
-                if abs(lot["signed_qty"]) < 1e-12:
-                    lots[key].pop(0)
-            if remaining > 1e-12:
-                open_signed = math.copysign(remaining, signed_qty)
-                if cost_profile.instrument_type == "FUTURES":
-                    cash -= fee * remaining / qty + tax * remaining / qty
-                else:
-                    cash -= open_signed * fill_price * remaining
-                lots[key].append({
-                    "signed_qty": open_signed, "entry_price": fill_price, "entry_ts": bar["bar_start"],
-                    "fee_remaining": fee * remaining / qty, "tax_remaining": tax * remaining / qty,
+                fill = {
+                    "order_id": oid, "symbol": order.symbol, "market": order.market,
+                    "contract": order.contract, "exec_ts": bar["bar_start"], "side": side,
+                    "qty": qty, "fill_price": fill_price, "fee": fee, "tax": tax,
                     "strategy_id": order.strategy_id, "experiment_id": order.experiment_id,
-                    "market": order.market, "symbol": order.symbol, "contract": order.contract,
+                    "session": bar["session"], "execution_assumption": "SAME_TIMESTAMP_BAR_OPEN" if bar["bar_start"] == record["available"] else "NEXT_ELIGIBLE_BAR_OPEN",
+                }
+                fills.append(fill)
+                record["done"] = True
+                if target_key is not None:
+                    target_positions[target_key] = float(order.target_position)
+
+                signed_qty = qty if side == "BUY" else -qty
+                lots.setdefault(key, [])
+                remaining = qty
+                # Consume opposite lots FIFO; each pair closes only within the same contract.
+                while remaining > 1e-12 and lots[key] and lots[key][0]["signed_qty"] * signed_qty < 0:
+                    lot = lots[key][0]
+                    matched = min(remaining, abs(lot["signed_qty"]))
+                    gross = (fill_price - lot["entry_price"]) * math.copysign(matched, lot["signed_qty"]) * multiplier
+                    entry_fee_alloc = lot["fee_remaining"] * matched / abs(lot["signed_qty"])
+                    exit_fee_alloc = fee * matched / qty
+                    entry_tax_alloc = lot["tax_remaining"] * matched / abs(lot["signed_qty"])
+                    exit_tax_alloc = tax * matched / qty
+                    net = gross - entry_fee_alloc - exit_fee_alloc - entry_tax_alloc - exit_tax_alloc
+                    if cost_profile.instrument_type == "FUTURES":
+                        cash += gross - exit_fee_alloc - exit_tax_alloc
+                    else:
+                        cash += math.copysign(fill_price * matched, lot["signed_qty"])
+                    start_ts = lot["entry_ts"]
+                    end_ts = bar["bar_start"]
+                    exclusion = next((label for start, end, label in config.exclusion_windows if _ts(start, config.timestamp_timezone) < end_ts and _ts(end, config.timestamp_timezone) > start_ts), None)
+                    trip = {
+                        "symbol": order.symbol, "market": order.market, "contract": order.contract,
+                        "entry_ts": start_ts, "exit_ts": end_ts, "side": "LONG" if lot["signed_qty"] > 0 else "SHORT",
+                        "qty": matched, "entry_price": lot["entry_price"], "exit_price": fill_price,
+                        "gross_pnl": _money(gross), "net_pnl": _money(net), "invalidated": bool(exclusion),
+                        "invalidation_reason": exclusion, "strategy_id": lot["strategy_id"], "experiment_id": lot["experiment_id"],
+                    }
+                    (invalid if exclusion else trips).append(trip)
+                    lot["signed_qty"] -= math.copysign(matched, lot["signed_qty"])
+                    lot["fee_remaining"] -= entry_fee_alloc
+                    lot["tax_remaining"] -= entry_tax_alloc
+                    remaining -= matched
+                    if abs(lot["signed_qty"]) < 1e-12:
+                        lots[key].pop(0)
+                if remaining > 1e-12:
+                    open_signed = math.copysign(remaining, signed_qty)
+                    if cost_profile.instrument_type == "FUTURES":
+                        cash -= fee * remaining / qty + tax * remaining / qty
+                    else:
+                        cash -= open_signed * fill_price * remaining
+                    lots[key].append({
+                        "signed_qty": open_signed, "entry_price": fill_price, "entry_ts": bar["bar_start"],
+                        "fee_remaining": fee * remaining / qty, "tax_remaining": tax * remaining / qty,
+                        "strategy_id": order.strategy_id, "experiment_id": order.experiment_id,
+                        "market": order.market, "symbol": order.symbol, "contract": order.contract,
+                    })
+                # Futures opening costs are charged at entry; equity costs are charged here as cash expenses.
+                if cost_profile.instrument_type == "FUTURES":
+                    opened = max(0.0, remaining)
+                    cash -= (fee + tax) * (1.0 - opened / qty)
+                else:
+                    cash -= fee + tax
+
+        for record in records:
+            if not record["done"]:
+                rejects.append({
+                    "order_id": record["oid"], "reason": record["last_reason"],
+                    "detail": "no eligible execution bar within TIF",
                 })
-            # Futures opening costs are charged at entry; equity costs are charged here as cash expenses.
-            if cost_profile.instrument_type == "FUTURES":
-                # Opening fee was charged above; avoid double charging when the fill only closes.
-                opened = max(0.0, remaining)
-                cash -= (fee + tax) * (1.0 - opened / qty)
-            else:
-                cash -= fee + tax
+                record["done"] = True
 
         # Mark-to-market the open lots with each final available close. No forced liquidation.
         marks = {(r["symbol"], r["contract"]): r for _, r in frame.groupby(["symbol", "contract"], sort=False).tail(1).iterrows()}
