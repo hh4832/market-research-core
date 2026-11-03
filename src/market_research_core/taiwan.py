@@ -233,14 +233,32 @@ class TaiwanEquityAdapter:
         out["research_eligible"] = out["official_listed"].map(_truth) & out["research_tier"].fillna("UNKNOWN").ne("ISOLATE")
         out["backtest_eligible"] = (out["research_eligible"] & out["pit_eligible"].map(_truth)
             & out["can_use_for_price_backtest"].map(_truth))
-        out["execution_eligible"] = (out["backtest_eligible"] & out["price_limit_status"].isin(USABLE_LIMIT_STATUS)
-            & out["buy_eligibility"].isin(ELIGIBLE_EXECUTION) & out["sell_eligibility"].isin(ELIGIBLE_EXECUTION)
+        base_eligible = (out["backtest_eligible"] & out["price_limit_status"].isin(USABLE_LIMIT_STATUS)
             & out["volume"].fillna(0).gt(0))
+        out["buy_execution_eligible"] = (base_eligible & out["buy_eligibility"].isin(ELIGIBLE_EXECUTION))
+        out["sell_execution_eligible"] = (base_eligible & out["sell_eligibility"].isin(ELIGIBLE_EXECUTION))
         clock = out["timestamp"].dt.strftime("%H:%M")
-        out["session"] = clock.map(lambda x: "CLOSE_AUCTION" if x == "13:30" else "REGULAR")
-        out.loc[out.session == "CLOSE_AUCTION", "execution_eligible"] = False
-        out["available_at"] = out["timestamp"] + pd.to_timedelta((out.session != "CLOSE_AUCTION").astype(int) * 5, unit="m")
-        out["market"], out["timezone"], out["timeframe"], out["contract"] = "TW", "Asia/Taipei", "5m", None
+        out["session"] = clock.map(lambda x: "CLOSE_AUCTION" if "13:25" <= x <= "13:30" else "REGULAR")
+        auction = out["session"].eq("CLOSE_AUCTION")
+        out.loc[auction, ["buy_execution_eligible", "sell_execution_eligible"]] = False
+        out["execution_eligible"] = out["buy_execution_eligible"] | out["sell_execution_eligible"]
+        out["execution_rejection_reason"] = ""
+        out["buy_execution_rejection_reason"] = ""
+        out["sell_execution_rejection_reason"] = ""
+        out.loc[~base_eligible, ["execution_rejection_reason", "buy_execution_rejection_reason", "sell_execution_rejection_reason"]] = "BAR_NOT_BACKTEST_OR_LIMIT_ELIGIBLE"
+        out.loc[base_eligible & ~out["buy_eligibility"].isin(ELIGIBLE_EXECUTION), "buy_execution_rejection_reason"] = "BUY_RULE_INELIGIBLE"
+        out.loc[base_eligible & ~out["sell_eligibility"].isin(ELIGIBLE_EXECUTION), "sell_execution_rejection_reason"] = "SELL_RULE_INELIGIBLE"
+        out["execution_rejection_reason"] = out["buy_execution_rejection_reason"].where(
+            out["buy_execution_rejection_reason"].ne(""), out["sell_execution_rejection_reason"])
+        out.loc[auction, ["execution_rejection_reason", "buy_execution_rejection_reason", "sell_execution_rejection_reason"]] = "CLOSING_AUCTION_NOT_EXECUTABLE"
+        out["bar_start"] = out["timestamp"]
+        out["bar_end"] = out["bar_start"] + pd.Timedelta(minutes=5)
+        out["available_at"] = out["bar_end"]
+        out.loc[auction, "available_at"] = out.loc[auction, "bar_end"] + pd.Timedelta(minutes=3)
+        out["session_open"] = out["bar_start"].dt.normalize() + pd.Timedelta(hours=9)
+        out["session_close"] = out["bar_start"].dt.normalize() + pd.Timedelta(hours=13, minutes=30)
+        out["timestamp_label"] = "START"
+        out["market"], out["timezone"], out["timeframe"], out["contract"] = "TW_EQUITY", "Asia/Taipei", "5m", "CASH"
         if usage.upper() == "BACKTEST" and not out["backtest_eligible"].any():
             raise PolicyViolation(f"{symbol} has no bars inside the approved backtest scope")
         out = out.set_index("timestamp", drop=False).sort_index()

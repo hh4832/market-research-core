@@ -91,7 +91,10 @@ def test_old_ibkr_interface_and_unified_interface(tmp_path):
     unified = client.load(market="IBKR", symbol="TSM")
     assert unified.provenance.market == "IBKR"
     assert {"data_exists", "research_eligible", "backtest_eligible", "execution_eligible"}.issubset(unified.frame.columns)
-    assert (unified.frame.available_at > unified.frame.timestamp).all()
+    assert unified.frame.timestamp_label.eq("UNKNOWN").all()
+    assert unified.frame.available_at.isna().all()
+    assert not unified.frame.buy_execution_eligible.any()
+    assert not unified.frame.sell_execution_eligible.any()
 
 
 def test_taiwan_adapter_enforces_pins_and_pit(monkeypatch, tmp_path):
@@ -100,8 +103,10 @@ def test_taiwan_adapter_enforces_pins_and_pit(monkeypatch, tmp_path):
     loaded = client.load(market="TW", symbol="2330")
     assert loaded.provenance.snapshot_id == tw.TW_FINAL_GATE_RUN
     assert loaded.frame.backtest_eligible.all()
-    assert loaded.frame.execution_eligible.all()
-    assert (loaded.frame.available_at > loaded.frame.timestamp).all()
+    assert loaded.frame.buy_execution_eligible.all()
+    assert loaded.frame.sell_execution_eligible.all()
+    assert loaded.frame.bar_start.equals(loaded.frame.timestamp)
+    assert (loaded.frame.available_at == loaded.frame.bar_end).all()
 
 
 def test_taiwan_unknown_limit_fails_closed(monkeypatch, tmp_path):

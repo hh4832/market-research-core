@@ -95,20 +95,32 @@ def _standardize(frame: pd.DataFrame, symbol: str, market: str, *, contract: str
     ts = out.index if isinstance(out.index, pd.DatetimeIndex) else pd.to_datetime(out["timestamp"], utc=True)
     out["timestamp"] = pd.DatetimeIndex(ts)
     out["symbol"] = symbol
-    out["market"] = market
+    out["market"] = ("IBKR_FUTURES" if market == "IBKR" and contract else
+                     "IBKR_EQUITY" if market == "IBKR" else market)
     out["timezone"] = timezone
     out["timeframe"] = "1m"
     if contract_column and contract_column in out:
         out["contract"] = out[contract_column].astype(str)
     else:
         out["contract"] = contract
+    # Keep the producer timestamp unchanged. Neither TXF nor the IBKR TSM
+    # snapshot has confirmed bar-label/session semantics, so execution fields
+    # are intentionally unavailable and both sides fail closed.
     if "session" not in out:
         out["session"] = "UNKNOWN"
+    out["bar_start"] = pd.NaT
+    out["bar_end"] = pd.NaT
+    out["available_at"] = pd.NaT
+    out["session_open"] = pd.NaT
+    out["session_close"] = pd.NaT
+    out["timestamp_label"] = "UNKNOWN"
     out["data_exists"] = True
     out["research_eligible"] = True
     out["backtest_eligible"] = True
-    out["execution_eligible"] = True
-    # Validated 1-minute snapshots use minute-start labels; OHLCV is complete
-    # only after the minute ends.
-    out["available_at"] = out["timestamp"] + pd.Timedelta(minutes=1)
+    out["buy_execution_eligible"] = False
+    out["sell_execution_eligible"] = False
+    out["execution_eligible"] = False
+    out["execution_rejection_reason"] = "TIMESTAMP_LABEL_OR_SESSION_UNKNOWN"
+    out["buy_execution_rejection_reason"] = "TIMESTAMP_LABEL_OR_SESSION_UNKNOWN"
+    out["sell_execution_rejection_reason"] = "TIMESTAMP_LABEL_OR_SESSION_UNKNOWN"
     return out
