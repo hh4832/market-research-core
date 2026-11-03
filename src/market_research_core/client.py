@@ -67,7 +67,8 @@ class MarketDataClient:
             provenance = UnifiedProvenance("IBKR", symbol_key, native.metadata.snapshot.run_name,
                 native.metadata.snapshot.producer_git_sha, native.metadata.verdict, (str(native.metadata.source_path),),
                 exclusion_rules=((f"mandatory:{INSTRUMENTS[symbol_key].exclusions_filename}",) if INSTRUMENTS[symbol_key].exclusions_filename else ()),
-                permitted_usage_scope="BACKTEST")
+                permitted_usage_scope=("BACKTEST" if not frame.empty and bool(frame["execution_eligible"].all())
+                                       else "RESEARCH_ONLY"))
             return UnifiedBars(frame, provenance, native)
         if market_key == "TXF":
             if self.config.txf_run_dir is None:
