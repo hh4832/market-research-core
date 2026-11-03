@@ -107,3 +107,10 @@ The output directory must be new or empty; the script refuses to overwrite resul
 ### Smallest remaining evidence
 
 One bounded run of this committed script against the existing mounted Parquet, preserving both CSVs and `run_info.json`, is required to establish the seven dates' actual first/last rows. To attribute a closing auction, the same date sample must additionally include a trade-level source with timestamps and sale/auction conditions (or an authoritative provider mapping of the auction print to its minute bar) and an independent official close. Without that trade-level evidence, auction attribution remains UNKNOWN even if the 15:59/16:00 OHLCV rows are present.
+
+
+### Official API definition scope check
+
+A final official-source check found that the legacy TWS API documentation directly describes `reqHistoricalData` and the returned `Bar.Time` value, but specifies only the time representation/time zone and says OHLCV values represent the market state during the covered candlestick period; it does not state that a 1-minute `Bar.Time` is the period start or end. IBKR's separate protobuf `HistoricalDataBar.date` reference does say “The start date of the bar’s covered data.” The reviewed snapshot downloader uses the legacy TWS `reqHistoricalData`/EWrapper.Bar path, and no acquisition receipt pins a protobuf route or schema. Therefore the protobuf field definition is not transferable evidence for this snapshot; label verdict remains UNKNOWN.
+
+Sources: [IBKR TWS Historical Bar Data](https://interactivebrokers.github.io/tws-api/historical_bars.html), [IBKR TWS Bar.Time](https://interactivebrokers.github.io/tws-api/classIBApi_1_1Bar.html), [IBKR protobuf HistoricalDataBar](https://ibkrcampus.eu/docs/tws-api/protobuf/historical-data-bar).
