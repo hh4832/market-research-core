@@ -298,7 +298,7 @@ class ExecutionEngine:
                     fill_price = min(fill_price, float(order.limit_price)) if side == "BUY" else max(fill_price, float(order.limit_price))
                 fee, tax = calculate_costs(fill_price, qty, side, cost_profile)
                 cost_multiplier = Decimal(str(config.cost_multiplier))
-                fee, tax = _money(fee * cost_multiplier), _money(tax * cost_multiplier)
+                fee, tax = fee * cost_multiplier, tax * cost_multiplier
                 signed_delta = qty if side == "BUY" else -qty
                 current_net = sum(lot["signed_qty"] for lot in lots.get(key, []))
                 resulting_net = current_net + signed_delta
@@ -334,14 +334,20 @@ class ExecutionEngine:
                 while remaining > 1e-12 and lots[key] and lots[key][0]["signed_qty"] * signed_qty < 0:
                     lot = lots[key][0]
                     matched = min(remaining, abs(lot["signed_qty"]))
-                    gross = (fill_price - lot["entry_price"]) * math.copysign(matched, lot["signed_qty"]) * multiplier
-                    entry_fee_alloc = lot["fee_remaining"] * matched / abs(lot["signed_qty"])
-                    exit_fee_alloc = fee * matched / qty
-                    entry_tax_alloc = lot["tax_remaining"] * matched / abs(lot["signed_qty"])
-                    exit_tax_alloc = tax * matched / qty
-                    net = gross - entry_fee_alloc - exit_fee_alloc - entry_tax_alloc - exit_tax_alloc
+                    matched_d = Decimal(str(matched))
+                    qty_d = Decimal(str(qty))
+                    entry_remaining_d = Decimal(str(abs(lot["signed_qty"])))
+                    gross_d = ((Decimal(str(fill_price)) - Decimal(str(lot["entry_price"])))
+                               * Decimal(str(math.copysign(matched, lot["signed_qty"])))
+                               * Decimal(str(multiplier)))
+                    entry_fee_alloc = lot["fee_remaining"] * matched_d / entry_remaining_d
+                    exit_fee_alloc = fee * matched_d / qty_d
+                    entry_tax_alloc = lot["tax_remaining"] * matched_d / entry_remaining_d
+                    exit_tax_alloc = tax * matched_d / qty_d
+                    net_d = gross_d - entry_fee_alloc - exit_fee_alloc - entry_tax_alloc - exit_tax_alloc
+                    gross = float(gross_d)
                     if cost_profile.instrument_type == "FUTURES":
-                        cash += gross - exit_fee_alloc - exit_tax_alloc
+                        cash += gross - float(exit_fee_alloc) - float(exit_tax_alloc)
                     else:
                         cash += math.copysign(fill_price * matched, lot["signed_qty"])
                     start_ts = lot["entry_ts"]
@@ -351,7 +357,7 @@ class ExecutionEngine:
                         "symbol": order.symbol, "market": order.market, "contract": order.contract,
                         "entry_ts": start_ts, "exit_ts": end_ts, "side": "LONG" if lot["signed_qty"] > 0 else "SHORT",
                         "qty": matched, "entry_price": lot["entry_price"], "exit_price": fill_price,
-                        "gross_pnl": _money(gross), "net_pnl": _money(net), "invalidated": bool(exclusion),
+                        "gross_pnl": _money(gross_d), "net_pnl": _money(net_d), "invalidated": bool(exclusion),
                         "invalidation_reason": exclusion, "strategy_id": lot["strategy_id"], "experiment_id": lot["experiment_id"],
                     }
                     (invalid if exclusion else trips).append(trip)
@@ -364,21 +370,21 @@ class ExecutionEngine:
                 if remaining > 1e-12:
                     open_signed = math.copysign(remaining, signed_qty)
                     if cost_profile.instrument_type == "FUTURES":
-                        cash -= fee * remaining / qty + tax * remaining / qty
+                        cash -= float((fee + tax) * Decimal(str(remaining)) / Decimal(str(qty)))
                     else:
                         cash -= open_signed * fill_price * remaining
                     lots[key].append({
                         "signed_qty": open_signed, "entry_price": fill_price, "entry_ts": bar["bar_start"],
-                        "fee_remaining": fee * remaining / qty, "tax_remaining": tax * remaining / qty,
+                        "fee_remaining": fee * Decimal(str(remaining)) / Decimal(str(qty)), "tax_remaining": tax * Decimal(str(remaining)) / Decimal(str(qty)),
                         "strategy_id": order.strategy_id, "experiment_id": order.experiment_id,
                         "market": order.market, "symbol": order.symbol, "contract": order.contract,
                     })
                 # Futures opening costs are charged at entry; equity costs are charged here as cash expenses.
                 if cost_profile.instrument_type == "FUTURES":
                     opened = max(0.0, remaining)
-                    cash -= (fee + tax) * (1.0 - opened / qty)
+                    cash -= float((fee + tax) * (Decimal("1") - Decimal(str(opened)) / Decimal(str(qty))))
                 else:
-                    cash -= fee + tax
+                    cash -= float(fee + tax)
 
             for record in records:
                 if (not record["done"] and record["order"].time_in_force == "DAY"
@@ -444,7 +450,7 @@ class ExecutionEngine:
                         queue.pop(0)
                 if remaining > 1e-12:
                     queue.append({"signed_qty": math.copysign(remaining, signed), "entry_price": item["fill_price"]})
-                mark_cash -= item["fee"] + item["tax"]
+                mark_cash -= float(item["fee"] + item["tax"])
             unrealized = 0.0
             market_value = 0.0
             margin = 0.0
