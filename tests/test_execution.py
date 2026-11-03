@@ -30,6 +30,8 @@ def test_side_eligibility_and_day_tif():
  f=bars(); f.loc[0,"buy_execution_eligible"]=False; f.loc[0,"execution_rejection_reason"]="LIMIT_UP_LOCKED_BUY"
  r=ExecutionEngine().run(f,[order("2024-01-02 09:00","BUY",tif="DAY")],cost_profile=profile(),config=config())
  assert r.fills.iloc[0].exec_ts==pd.Timestamp("2024-01-02 09:01",tz="Asia/Taipei")
+ assert r.rejections.iloc[0].bar_ts==pd.Timestamp("2024-01-02 09:00",tz="Asia/Taipei")
+ assert r.rejections.iloc[0].reason=="LIMIT_UP_LOCKED_BUY"
 def test_zero_volume_rejected():
  f=bars(); f.loc[0,"volume"]=0
  r=ExecutionEngine().run(f,[order("2024-01-02 09:00","BUY")],cost_profile=profile(),config=config()); assert r.rejections.iloc[0].reason=="ZERO_VOLUME_BAR"
@@ -152,3 +154,20 @@ def test_day_tif_survives_to_first_session_close_after_order_time():
    signal_available_at=pd.Timestamp("2024-01-02 13:30",tz="Asia/Taipei"))
  r=ExecutionEngine().run(f,[o],cost_profile=profile(),config=config())
  assert r.fills.iloc[0].exec_ts==pd.Timestamp("2024-01-03 09:00",tz="Asia/Taipei")
+ assert list(r.rejections.bar_ts)==[
+   pd.Timestamp("2024-01-02 13:30",tz="Asia/Taipei"),
+   pd.Timestamp("2024-01-03 08:55",tz="Asia/Taipei")]
+ assert list(r.rejections.reason)==["OUTSIDE_SESSION","OUTSIDE_SESSION"]
+
+def test_day_tif_records_each_rejected_candidate_bar_before_later_fill():
+ f=bars()
+ f.loc[0,"volume"]=0
+ f.loc[1,"buy_execution_eligible"]=False
+ f.loc[1,"buy_execution_rejection_reason"]="LIMIT_UP_LOCKED_BUY"
+ r=ExecutionEngine().run(f,[order("2024-01-02 09:00","BUY",tif="DAY")],
+   cost_profile=profile(),config=config())
+ assert r.fills.iloc[0].exec_ts==pd.Timestamp("2024-01-02 09:02",tz="Asia/Taipei")
+ assert list(r.rejections.bar_ts)==[
+   pd.Timestamp("2024-01-02 09:00",tz="Asia/Taipei"),
+   pd.Timestamp("2024-01-02 09:01",tz="Asia/Taipei")]
+ assert list(r.rejections.reason)==["ZERO_VOLUME_BAR","LIMIT_UP_LOCKED_BUY"]
