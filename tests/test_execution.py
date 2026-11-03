@@ -131,8 +131,8 @@ def test_unrounded_cost_precision_flows_into_realized_pnl():
  r=ExecutionEngine().run(f,[order("2024-01-02 09:00","BUY"),
    order("2024-01-02 09:02","SELL")],cost_profile=p,
    config=config(permitted_usage_scope="RESEARCH_ONLY"))
- assert abs(float(r.fills.iloc[0].fee)-0.1425)<1e-12
- assert abs(float(r.fills.iloc[1].tax)-0.306)<1e-12
+ assert r.fills.iloc[0].fee==Decimal("0.1425")
+ assert r.fills.iloc[1].tax==Decimal("0.306")
  assert abs(float(r.round_trips.iloc[0].net_pnl)-1.40615)<1e-10
 
 def test_day_tif_survives_to_first_session_close_after_order_time():
