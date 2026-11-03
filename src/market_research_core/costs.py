@@ -81,8 +81,10 @@ def calculate_costs(price: float, quantity: float, side: str, profile: CostProfi
     return _round(fee, profile.fee_rounding), _round(tax, profile.tax_rounding)
 
 
-def adverse_fill_price(price: float, side: str, profile: CostProfile) -> float:
-    move = profile.slippage_ticks * profile.tick_size
+def adverse_fill_price(price: float, side: str, profile: CostProfile, cost_multiplier: float = 1.0) -> float:
+    if not math.isfinite(cost_multiplier) or cost_multiplier < 0:
+        raise ValueError("cost_multiplier must be finite and non-negative")
+    move = profile.slippage_ticks * profile.tick_size * cost_multiplier
     value = price + move if side == "BUY" else price - move
     tick = profile.tick_size
     # Round against the trader to a valid tick.

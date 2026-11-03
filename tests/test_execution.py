@@ -18,6 +18,7 @@ def order(tm,side,qty=1,tif="NEXT_BAR"):
 def test_pit_and_same_timestamp():
  r=ExecutionEngine().run(bars(),[order("2024-01-02 09:00","BUY")],cost_profile=profile(),config=config())
  assert r.fills.iloc[0].execution_assumption=="SAME_TIMESTAMP_BAR_OPEN"
+ assert r.provenance["execution_convention"]=="oracle-execution-convention-v1"
  with pytest.raises(ValueError,match="UNKNOWN"): config(bar_label="UNKNOWN")
 def test_pit_rejected():
  o=order("2024-01-02 09:00","BUY"); o=ExecutionOrder(**{**o.__dict__,"order_time":pd.Timestamp("2024-01-02 08:59",tz="Asia/Taipei")})
@@ -42,3 +43,35 @@ def test_unknown_execution_timing_fails_closed():
  f=bars(); f.loc[0,"bar_start"]=pd.NaT
  with pytest.raises(ValueError,match="UNKNOWN"):
   ExecutionEngine().run(f,[order("2024-01-02 09:00","BUY")],cost_profile=profile(),config=config())
+
+def test_cost_multiplier_scales_cost_and_slippage():
+ from dataclasses import replace
+ p=replace(profile(),slippage_ticks=1)
+ r=ExecutionEngine().run(bars(),[order("2024-01-02 09:00","BUY")],cost_profile=p,config=config(cost_multiplier=2))
+ assert r.fills.iloc[0].fill_price==102
+ assert r.fills.iloc[0].fee==2
+ assert r.provenance["cost_multiplier"]==2
+
+def test_futures_use_margin_not_full_notional_and_reject_margin_breach():
+ f=bars(); f["symbol"]="TXF"; f["market"]="TXF"; f["contract"]="TXF202403"
+ o=ExecutionOrder(symbol="TXF",market="TXF",contract="TXF202403",
+   signal_time=pd.Timestamp("2024-01-02 08:59",tz="Asia/Taipei"),
+   signal_available_at=pd.Timestamp("2024-01-02 09:00",tz="Asia/Taipei"),
+   order_time=pd.Timestamp("2024-01-02 09:00",tz="Asia/Taipei"),side="BUY",
+   quantity=1,strategy_id="s",experiment_id="e")
+ p=CostProfile(profile_id="future",version="1",instrument_type="FUTURES",approval_status="DRAFT",
+   source_evidence="fixture",basis="ASSUMED",equity_commission_rate=0,minimum_commission=0,
+   sell_tax_rate=0,futures_fee_per_contract_per_side=10,futures_transaction_tax_rate=.00002,
+   contract_multiplier=50,tick_size=1,slippage_ticks=0,fee_rounding="HALF_UP",tax_rounding="HALF_UP",
+   component_basis={x:"ASSUMED" for x in FIELDS})
+ ok=ExecutionEngine().run(f,[o],cost_profile=p,config=config(initial_margin_per_contract=1000,permitted_usage_scope="RESEARCH_ONLY"))
+ assert ok.equity_curve.iloc[-1].margin_requirement==1000
+ assert ok.equity_curve.iloc[-1].cash>99000
+ blocked=ExecutionEngine().run(f,[o],cost_profile=p,config=config(initial_cash=1000,initial_margin_per_contract=2000,permitted_usage_scope="RESEARCH_ONLY"))
+ assert blocked.rejections.iloc[0].reason=="INSUFFICIENT_MARGIN"
+ assert blocked.fills.empty
+
+def test_outside_session_order_is_rejected():
+ f=bars(); f.loc[0,"session_open"]=pd.Timestamp("2024-01-02 09:01",tz="Asia/Taipei")
+ r=ExecutionEngine().run(f,[order("2024-01-02 09:00","BUY")],cost_profile=profile(),config=config())
+ assert r.rejections.iloc[0].reason=="OUTSIDE_SESSION"

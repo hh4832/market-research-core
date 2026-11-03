@@ -64,10 +64,18 @@ class ExecutionConfig:
     dataset_producer_sha: str = "UNKNOWN"
     dataset_verdict: str = "UNKNOWN"
     permitted_usage_scope: str = "RESEARCH_ONLY"
+    spec_sha256: str = "UNKNOWN"
+    parameters: dict[str, Any] = field(default_factory=dict)
+    cost_multiplier: float = 1.0
+    seed: int | None = None
+    window_start: Any = None
+    window_end: Any = None
 
     def __post_init__(self) -> None:
         if self.initial_cash <= 0:
             raise ValueError("initial_cash must be positive")
+        if not math.isfinite(self.cost_multiplier) or self.cost_multiplier < 0:
+            raise ValueError("cost_multiplier must be finite and non-negative")
         if self.bar_label == "UNKNOWN" or self.session_semantics == "UNKNOWN":
             raise ValueError("formal execution is blocked when bar label or session semantics are UNKNOWN")
         if self.timestamp_timezone != "Asia/Taipei" and self.timestamp_timezone != "America/New_York" and not self.timestamp_timezone:
@@ -252,10 +260,11 @@ class ExecutionEngine:
                 continue
 
             bar, raw_price = chosen
-            fill_price = adverse_fill_price(raw_price, side, cost_profile)
+            fill_price = adverse_fill_price(raw_price, side, cost_profile, config.cost_multiplier)
             if order.order_type == "LIMIT":
                 fill_price = min(fill_price, float(order.limit_price)) if side == "BUY" else max(fill_price, float(order.limit_price))
             fee, tax = calculate_costs(fill_price, qty, side, cost_profile)
+            fee, tax = _money(fee * config.cost_multiplier), _money(tax * config.cost_multiplier)
             signed_delta = qty if side == "BUY" else -qty
             current_net = sum(lot["signed_qty"] for lot in lots.get(key, []))
             resulting_net = current_net + signed_delta
@@ -411,12 +420,15 @@ class ExecutionEngine:
         profile_sha = cost_profile.sha256
         provenance = {
             "engine_name": "market-research-core.ExecutionEngine", "engine_git_sha": config.core_commit_sha,
-            "engine_version": "2.1.0", "execution_convention": "mrc-execution-v1",
+            "engine_version": "2.1.0", "execution_convention": "oracle-execution-convention-v1",
             "dataset_snapshot_id": config.dataset_snapshot_id, "dataset_producer_sha": config.dataset_producer_sha,
             "dataset_verdict": config.dataset_verdict, "cost_profile_id": cost_profile.profile_id,
             "cost_profile_sha256": profile_sha, "cost_profile_approval": cost_profile.approval_status,
             "exclusions_applied": [label for _, _, label in config.exclusion_windows],
             "strategy_ids": sorted({o.strategy_id for o in orders}), "experiment_ids": sorted({o.experiment_id for o in orders}),
+            "spec_sha256": config.spec_sha256, "parameters": config.parameters,
+            "cost_multiplier": config.cost_multiplier, "seed": config.seed,
+            "window_start": config.window_start, "window_end": config.window_end,
             "bar_label": config.bar_label, "session_semantics": config.session_semantics,
             "timestamp_timezone": config.timestamp_timezone, "assumptions": assumptions,
             "permitted_usage_scope": config.permitted_usage_scope,
@@ -429,6 +441,7 @@ class ExecutionEngine:
             and config.core_commit_sha != "UNKNOWN"
             and config.dataset_snapshot_id != "UNKNOWN"
             and config.dataset_producer_sha != "UNKNOWN"
+            and config.spec_sha256 != "UNKNOWN"
         )
         return ExecutionResult(
             fills=pd.DataFrame(fills), round_trips=pd.DataFrame(trips), rejections=pd.DataFrame(rejects),
