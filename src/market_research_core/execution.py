@@ -442,6 +442,7 @@ class ExecutionEngine:
             and config.dataset_snapshot_id != "UNKNOWN"
             and config.dataset_producer_sha != "UNKNOWN"
             and config.spec_sha256 != "UNKNOWN"
+            and not invalid
         )
         return ExecutionResult(
             fills=pd.DataFrame(fills), round_trips=pd.DataFrame(trips), rejections=pd.DataFrame(rejects),
