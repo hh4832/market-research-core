@@ -80,7 +80,7 @@ def test_formal_status_requires_complete_approved_provenance():
  from dataclasses import replace
  p=replace(profile(),component_basis={x:"OFFICIAL" for x in FIELDS})
  r=ExecutionEngine().run(bars(),[order("2024-01-02 09:00","BUY")],cost_profile=p,
-   config(spec_sha256="c"*64,dataset_verdict="SCOPED_GO"))
+   config=config(spec_sha256="c"*64,dataset_verdict="SCOPED_GO"))
  assert r.status=="FORMAL_ELIGIBLE"
 
 def test_formal_status_rejects_short_producer_sha():
