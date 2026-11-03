@@ -26,7 +26,24 @@ Map Phase 3 bar fields directly: timestamp to \`bar_start\` only when source sem
 
 ## Benchmark status
 
-B01-B12 are NOT RUN in this repository. The independent Phase 3 Oracle remains authoritative; no oracle answers were edited. A downstream adapter must compare these cases before benchmark PASS can be claimed. Unknown TXF label and IBKR TSM session coverage remain market-specific blocks.
+The independent Phase 3 Oracle remains authoritative; no oracle answers were edited. Every case below is **NOT_IMPLEMENTED as an Oracle comparison** (the engine feature coverage is noted separately). Do not claim Benchmark PASS until the Phase 3 harness runs against this API.
+
+| Case | Oracle comparison | Core feature coverage |
+| --- | --- | --- |
+| B01 ordinary execution | NOT_IMPLEMENTED | MARKET fill path |
+| B02 next-bar signal | NOT_IMPLEMENTED | Explicit availability/order timing |
+| B03 missing bar | NOT_IMPLEMENTED | NEXT_BAR rejects if first extant bar is ineligible; exact Oracle rule needs comparison |
+| B04 zero volume | NOT_IMPLEMENTED | Rejects zero-volume bar |
+| B05 outside session | NOT_IMPLEMENTED | Session-open/close gate |
+| B06 costs/slippage and short | NOT_IMPLEMENTED | Cost profile and short FIFO path |
+| B07 side-specific limit lock | NOT_IMPLEMENTED | Independent buy/sell eligibility |
+| B08 PIT availability | NOT_IMPLEMENTED | Rejects order_time before signal_available_at |
+| B09 futures roll | NOT_IMPLEMENTED | FIFO lots keyed by actual contract |
+| B10 open position | NOT_IMPLEMENTED | End-of-data position remains open |
+| B11 exclusion window | NOT_IMPLEMENTED | Cross-window trade invalidation |
+| B12 ORB lookahead | NOT_IMPLEMENTED | Engine accepts orders only; signal-generation lookahead stays with Phase 3 |
+
+Unknown TXF label and IBKR TSM session coverage remain market-specific blocks.
 
 ## Limitations
 
