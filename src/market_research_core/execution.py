@@ -553,6 +553,7 @@ class ExecutionEngine:
             "dataset_snapshot_id": config.dataset_snapshot_id, "dataset_producer_sha": config.dataset_producer_sha,
             "dataset_verdict": config.dataset_verdict, "cost_profile_id": cost_profile.profile_id,
             "cost_profile_sha256": profile_sha, "cost_profile_approval": cost_profile.approval_status,
+            "cost_profile_components": cost_profile.components,
             "exclusions_applied": [label for _, _, label in config.exclusion_windows],
             "strategy_ids": sorted({o.strategy_id for o in orders}), "experiment_ids": sorted({o.experiment_id for o in orders}),
             "spec_sha256": config.spec_sha256, "parameters": config.parameters,
