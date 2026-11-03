@@ -199,16 +199,22 @@ class ExecutionEngine:
             ]
             if not config.same_timestamp_open_assumption:
                 matching = matching[matching["bar_start"] > max(available, order_time)]
+            expiry = None
             if order.time_in_force == "NEXT_BAR":
                 matching = matching.iloc[:1]
             elif not matching.empty:
-                first_session_open = matching.iloc[0]["session_open"]
-                matching = matching[matching["session_open"] == first_session_open]
+                session_ends = matching.loc[matching["session_close"] > order_time, "session_close"]
+                if session_ends.empty:
+                    matching = matching.iloc[0:0]
+                else:
+                    expiry = pd.Timestamp(session_ends.min())
+                    matching = matching[matching["bar_start"] <= expiry]
 
             records.append({
                 "idx": order_idx, "oid": oid, "order": order,
                 "signal_time": signal_time, "available": available, "order_time": order_time,
                 "target_key": (order.strategy_id, order.symbol, order.contract) if order.target_position is not None else None,
+                "expiry": expiry,
                 "candidate_rows": {pd.Timestamp(row["bar_start"]): row for _, row in matching.iterrows()},
                 "last_reason": "UNFILLED_AT_END_OF_DATA", "done": False,
             })
@@ -223,6 +229,7 @@ class ExecutionEngine:
             live = sorted(
                 (record for record in records
                  if not record["done"] and record["order_time"] <= event_ts
+                 and (record["expiry"] is None or event_ts <= record["expiry"])
                  and event_ts in record["candidate_rows"]),
                 key=lambda record: (record["order_time"], record["order"].order_id or ""),
             )
@@ -248,9 +255,7 @@ class ExecutionEngine:
                     continue
 
                 reason: str | None = None
-                if order.time_in_force == "DAY" and bar["bar_start"] >= bar["session_close"]:
-                    reason = "ORDER_EXPIRED"
-                elif bar["bar_start"] < bar["session_open"] or bar["bar_start"] >= bar["session_close"]:
+                if bar["bar_start"] < bar["session_open"] or bar["bar_start"] >= bar["session_close"]:
                     reason = "OUTSIDE_SESSION"
                 elif not bool(bar["data_exists"]) or not bool(bar["backtest_eligible"]):
                     reason = "BAR_NOT_ELIGIBLE"
@@ -373,6 +378,15 @@ class ExecutionEngine:
                     cash -= (fee + tax) * (1.0 - opened / qty)
                 else:
                     cash -= fee + tax
+
+            for record in records:
+                if (not record["done"] and record["order"].time_in_force == "DAY"
+                        and record["expiry"] is not None and event_ts >= record["expiry"]):
+                    rejects.append({
+                        "order_id": record["oid"], "bar_ts": record["expiry"],
+                        "reason": "ORDER_EXPIRED", "detail": "DAY order reached its first session close after order_time",
+                    })
+                    record["done"] = True
 
         for record in records:
             if not record["done"]:
