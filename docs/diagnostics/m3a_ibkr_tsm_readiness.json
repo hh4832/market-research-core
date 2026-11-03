@@ -1,0 +1,73 @@
+{
+  "schema_version": "1.0.0",
+  "gate_id": "M3-A-IBKR-TSM",
+  "decision": {
+    "formal_execution": "NO_GO",
+    "bounded_data_diagnostics": "SCOPED_GO_RESEARCH_ONLY"
+  },
+  "core_base_sha": "bf01fa92bc95f9fc8b04038875c813f6cd30ad99",
+  "dataset": {
+    "snapshot_id": "20261101_205431_06359faf7ef4_IBKR_FINAL_GATE_FULL",
+    "producer_sha": "06359faf7ef4b8ff702a7ab1a6d07521d3b68f28",
+    "instrument": "TSM",
+    "quality_verdict": "GO",
+    "rows": 2193372,
+    "errors": 0,
+    "unresolved_minutes": 0,
+    "excluded_candidates": 0
+  },
+  "timestamp_session": {
+    "source_timestamp_timezone": "UTC",
+    "source_request": {
+      "bar_size": "1 min",
+      "what_to_show": "TRADES",
+      "use_rth": false,
+      "format_date": 2,
+      "keep_up_to_date": false
+    },
+    "coverage": "RTH_AND_AVAILABLE_ETH",
+    "timestamp_label": "UNKNOWN",
+    "bar_start": "UNKNOWN",
+    "bar_end": "UNKNOWN",
+    "available_at": "UNKNOWN",
+    "per_bar_session_mask": "UNKNOWN",
+    "calendar": "NYSE via pandas_market_calendars; exact dependency version not pinned in snapshot",
+    "daylight_saving": "UTC source; producer converts to America/New_York using IANA timezone",
+    "early_closes": "NYSE schedule used; exact dependency version not pinned in snapshot"
+  },
+  "execution_eligibility": {
+    "buy": false,
+    "sell": false,
+    "rejection_reason": "TIMESTAMP_LABEL_OR_SESSION_UNKNOWN",
+    "earliest_execution": "BLOCKED_UNTIL_BAR_AVAILABILITY_AND_BOUNDARIES_CONFIRMED",
+    "same_bar_execution": false,
+    "market_status": "RESEARCH_ONLY"
+  },
+  "cost_profile": {
+    "id": "ibkr_us_equity",
+    "version": "0.1.0",
+    "sha256": "50149cd2198a49ddb9acadff536f6765e7d938e62bd47e3c40089a561c0f97e5",
+    "approval_status": "DRAFT",
+    "components": {
+      "commission_per_share_usd": {"value": 0.005, "basis": "ASSUMED"},
+      "minimum_commission_usd": {"value": 1.0, "basis": "ASSUMED"},
+      "slippage_bps": {"value": 2, "basis": "ASSUMED"},
+      "spread": {"value": null, "basis": "ASSUMED", "status": "UNMODELED"},
+      "sell_side_regulatory_fees_or_taxes": {"value": null, "basis": "ASSUMED", "status": "UNKNOWN_NOT_ZERO"},
+      "volume_participation_cap": {"value": null, "basis": "ASSUMED", "status": "UNKNOWN"}
+    },
+    "cost_multiplier_sensitivity_proposed": [1, 2, 3],
+    "profile_approval_evidence": null
+  },
+  "probe": {
+    "executed": false,
+    "reason": [
+      "TIMESTAMP_LABEL_UNKNOWN",
+      "AVAILABLE_AT_UNKNOWN",
+      "SESSION_MASK_UNKNOWN",
+      "COST_PROFILE_DRAFT",
+      "CORE_COST_SCHEMA_NOT_LOSSLESS_FOR_PER_SHARE_COMMISSION"
+    ],
+    "archive": "NOT_CREATED_NO_EXECUTION_OUTPUT"
+  }
+}
