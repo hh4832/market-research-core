@@ -437,7 +437,7 @@ class ExecutionEngine:
             config.permitted_usage_scope == "BACKTEST"
             and cost_profile.approval_status == "APPROVED"
             and all(basis != "ASSUMED" for basis in cost_profile.component_basis.values())
-            and config.dataset_verdict == "GO"
+            and config.dataset_verdict in {"GO", "SCOPED_GO"}
             and config.core_commit_sha != "UNKNOWN"
             and config.dataset_snapshot_id != "UNKNOWN"
             and config.dataset_producer_sha != "UNKNOWN"
