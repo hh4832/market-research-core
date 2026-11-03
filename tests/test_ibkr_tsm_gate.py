@@ -201,6 +201,8 @@ def test_new_cost_components_flow_through_trade_ledger():
     assert list(result.fills.regulatory_fee) == [Decimal("0"), Decimal("1.01")]
     assert result.round_trips.iloc[0].net_pnl == pytest.approx(8.79)
     assert result.status == "RESEARCH_ONLY"
+    assert result.provenance["cost_profile_components"]["commission_per_share"]["source_evidence"] == "synthetic fixture"
+    assert result.provenance["cost_profile_components"]["commission_per_share"]["approval_status"] == "PENDING"
 
 
 def test_volume_participation_cap_rejects_full_quantity_without_partial_fill():
