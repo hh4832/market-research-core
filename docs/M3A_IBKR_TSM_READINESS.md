@@ -82,7 +82,6 @@ bars = client.load(
     symbol="TSM",
     start="2024-01-02T14:30:00Z",
     end="2024-01-05T21:00:00Z",
-    usage="RESEARCH_ONLY",
 )
 ```
 
