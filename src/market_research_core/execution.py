@@ -167,12 +167,15 @@ class ExecutionEngine:
                 rejects.append({"order_id": oid, "reason": "PIT_VIOLATION", "detail": "signal_available_at/order_time precedes prior information"})
                 order_outcomes[oid] = "REJECTED"
                 continue
+            if order.market == "TXF" and config.initial_margin_per_contract is None:
+                raise ValueError("TXF execution requires explicit initial_margin_per_contract")
             if order.market == "TXF" and cost_profile.instrument_type != "FUTURES":
                 raise ValueError("TXF requires a FUTURES CostProfile")
             if order.market != "TXF" and cost_profile.instrument_type != "EQUITY":
                 raise ValueError("equity market requires an EQUITY CostProfile")
 
             key = (order.symbol, order.contract)
+            target_key = None
             if order.target_position is not None:
                 target_key = (order.strategy_id, order.symbol, order.contract)
                 current_target = target_positions.get(target_key, 0.0)
@@ -182,7 +185,6 @@ class ExecutionEngine:
                     continue
                 side = "BUY" if delta > 0 else "SELL"
                 qty = abs(delta)
-                target_positions[target_key] = order.target_position
             else:
                 side, qty = order.side, float(order.quantity)
             if side != order.side:
@@ -247,6 +249,8 @@ class ExecutionEngine:
 
             bar, raw_price = chosen
             fill_price = adverse_fill_price(raw_price, side, cost_profile)
+            if order.order_type == "LIMIT":
+                fill_price = min(fill_price, float(order.limit_price)) if side == "BUY" else max(fill_price, float(order.limit_price))
             fee, tax = calculate_costs(fill_price, qty, side, cost_profile)
             signed_delta = qty if side == "BUY" else -qty
             current_net = sum(lot["signed_qty"] for lot in lots.get(key, []))
@@ -273,6 +277,8 @@ class ExecutionEngine:
             }
             fills.append(fill)
             order_outcomes[oid] = "FILLED"
+            if target_key is not None:
+                target_positions[target_key] = float(order.target_position)
 
             multiplier = cost_profile.contract_multiplier if cost_profile.instrument_type == "FUTURES" else 1.0
             signed_qty = qty if side == "BUY" else -qty
@@ -291,7 +297,7 @@ class ExecutionEngine:
                 if cost_profile.instrument_type == "FUTURES":
                     cash += gross - exit_fee_alloc - exit_tax_alloc
                 else:
-                    cash -= math.copysign(fill_price * matched, lot["signed_qty"])
+                    cash += math.copysign(fill_price * matched, lot["signed_qty"])
                 start_ts = lot["entry_ts"]
                 end_ts = bar["bar_start"]
                 exclusion = next((label for start, end, label in config.exclusion_windows if _ts(start, config.timestamp_timezone) < end_ts and _ts(end, config.timestamp_timezone) > start_ts), None)
@@ -347,15 +353,57 @@ class ExecutionEngine:
                     "entry_ts": lot["entry_ts"], "strategy_id": lot["strategy_id"], "experiment_id": lot["experiment_id"],
                 })
         open_df = pd.DataFrame(open_rows)
-        net_realized = sum(x["net_pnl"] for x in trips)
-        unrealized_total = sum(x["unrealized_pnl"] for x in open_rows)
-        equity_value = cash + unrealized_total if cost_profile.instrument_type == "FUTURES" else cash + sum(
-            float(marks[k]["close"]) * sum(l["signed_qty"] for l in v) for k, v in lots.items()
-        )
-        final_ts = frame["bar_end"].max()
-        eq = pd.DataFrame([{"timestamp": final_ts, "cash": _money(cash), "realized_net_pnl": _money(net_realized),
-                            "unrealized_pnl": _money(unrealized_total), "margin_requirement": _money(open_df["margin_requirement"].sum()) if not open_df.empty else 0.0,
-                            "equity": _money(equity_value)}])
+        # Rebuild account marks at every bar close from fills and FIFO lots.
+        curve = []
+        mark_lots: dict[tuple[str, str], list[dict[str, float]]] = {}
+        mark_cash = float(config.initial_cash)
+        fills_by_time: dict[pd.Timestamp, list[dict[str, Any]]] = {}
+        for item in fills:
+            fills_by_time.setdefault(pd.Timestamp(item["exec_ts"]), []).append(item)
+        for _, bar in frame.iterrows():
+            k = (bar["symbol"], bar["contract"])
+            for item in fills_by_time.pop(pd.Timestamp(bar["bar_start"]), []):
+                signed = item["qty"] if item["side"] == "BUY" else -item["qty"]
+                queue = mark_lots.setdefault(k, [])
+                remaining = float(item["qty"])
+                if cost_profile.instrument_type == "EQUITY":
+                    mark_cash -= signed * item["fill_price"]
+                while remaining > 1e-12 and queue and queue[0]["signed_qty"] * signed < 0:
+                    lot = queue[0]
+                    matched = min(remaining, abs(lot["signed_qty"]))
+                    gross = ((item["fill_price"] - lot["entry_price"])
+                             * math.copysign(matched, lot["signed_qty"])
+                             * (cost_profile.contract_multiplier if cost_profile.instrument_type == "FUTURES" else 1.0))
+                    if cost_profile.instrument_type == "FUTURES":
+                        mark_cash += gross
+                    lot["signed_qty"] -= math.copysign(matched, lot["signed_qty"])
+                    remaining -= matched
+                    if abs(lot["signed_qty"]) < 1e-12:
+                        queue.pop(0)
+                if remaining > 1e-12:
+                    queue.append({"signed_qty": math.copysign(remaining, signed), "entry_price": item["fill_price"]})
+                mark_cash -= item["fee"] + item["tax"]
+            unrealized = 0.0
+            market_value = 0.0
+            margin = 0.0
+            for (symbol, contract), queue in mark_lots.items():
+                matching_bar = frame[(frame["symbol"] == symbol) & (frame["contract"] == contract)
+                                     & (frame["bar_start"] <= bar["bar_start"])]
+                if matching_bar.empty:
+                    continue
+                mark_price = float(matching_bar.iloc[-1]["close"])
+                for lot in queue:
+                    signed_qty = lot["signed_qty"]
+                    unrealized += ((mark_price - lot["entry_price"]) * signed_qty
+                                   * (cost_profile.contract_multiplier if cost_profile.instrument_type == "FUTURES" else 1.0))
+                    market_value += mark_price * signed_qty
+                    if cost_profile.instrument_type == "FUTURES":
+                        margin += abs(signed_qty) * (config.initial_margin_per_contract or 0.0)
+            curve.append({"timestamp": bar["bar_end"], "cash": _money(mark_cash),
+                          "realized_net_pnl": _money(mark_cash - config.initial_cash - unrealized) if cost_profile.instrument_type == "FUTURES" else _money(mark_cash - config.initial_cash + market_value),
+                          "unrealized_pnl": _money(unrealized), "margin_requirement": _money(margin),
+                          "equity": _money(mark_cash + unrealized if cost_profile.instrument_type == "FUTURES" else mark_cash + market_value)})
+        eq = pd.DataFrame(curve)
         profile_sha = cost_profile.sha256
         provenance = {
             "engine_name": "market-research-core.ExecutionEngine", "engine_git_sha": config.core_commit_sha,
@@ -372,6 +420,7 @@ class ExecutionEngine:
         formal_eligible = (
             config.permitted_usage_scope == "BACKTEST"
             and cost_profile.approval_status == "APPROVED"
+            and all(basis != "ASSUMED" for basis in cost_profile.component_basis.values())
             and config.dataset_verdict == "GO"
             and config.core_commit_sha != "UNKNOWN"
             and config.dataset_snapshot_id != "UNKNOWN"
