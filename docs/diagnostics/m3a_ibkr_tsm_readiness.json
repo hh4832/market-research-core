@@ -161,6 +161,23 @@
     "final_gate_rerun": false,
     "full_snapshot_download": false,
     "raw_mutated": false,
-    "required_next_evidence": "Run the committed bounded PyArrow audit against the mounted existing Drive file and preserve its CSV/JSON output; auction attribution additionally needs trade-time/sale-condition evidence or authoritative provider mapping plus independent official close."
+    "required_next_evidence": "Run the committed bounded PyArrow audit against the mounted existing Drive file and preserve its CSV/JSON output; auction attribution additionally needs trade-time/sale-condition evidence or authoritative provider mapping plus independent official close.",
+    "official_api_scope": {
+      "tws_req_historical_data": {
+        "timestamp_label": "NOT_SPECIFIED_IN_REVIEWED_OFFICIAL_DOCS",
+        "sources": [
+          "https://interactivebrokers.github.io/tws-api/historical_bars.html",
+          "https://interactivebrokers.github.io/tws-api/classIBApi_1_1Bar.html"
+        ],
+        "summary": "TWS API docs describe reqHistoricalData, Bar.Time representation/time zone, and covered candlestick values, but do not define a 1-minute Bar.Time as interval start or end."
+      },
+      "protobuf_historical_data_bar": {
+        "timestamp_label": "START_OF_COVERED_DATA",
+        "source": "https://ibkrcampus.eu/docs/tws-api/protobuf/historical-data-bar",
+        "applies_to_pinned_snapshot": false,
+        "reason": "Reviewed downloader route uses legacy TWS reqHistoricalData/EWrapper.Bar; no acquisition receipt pins protobuf route/schema."
+      },
+      "overall_snapshot_verdict": "UNKNOWN"
+    }
   }
 }
