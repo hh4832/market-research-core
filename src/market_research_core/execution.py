@@ -9,6 +9,7 @@ from datetime import datetime
 from hashlib import sha256
 import json
 import math
+import re
 from typing import Any, Iterable, Literal
 
 import pandas as pd
@@ -438,10 +439,10 @@ class ExecutionEngine:
             and cost_profile.approval_status == "APPROVED"
             and all(basis != "ASSUMED" for basis in cost_profile.component_basis.values())
             and config.dataset_verdict in {"GO", "SCOPED_GO"}
-            and config.core_commit_sha != "UNKNOWN"
-            and config.dataset_snapshot_id != "UNKNOWN"
-            and config.dataset_producer_sha != "UNKNOWN"
-            and config.spec_sha256 != "UNKNOWN"
+            and bool(re.fullmatch(r"[0-9a-fA-F]{40}", config.core_commit_sha))
+            and bool(config.dataset_snapshot_id and config.dataset_snapshot_id != "UNKNOWN")
+            and bool(re.fullmatch(r"[0-9a-fA-F]{40}", config.dataset_producer_sha))
+            and bool(re.fullmatch(r"[0-9a-fA-F]{64}", config.spec_sha256))
             and not invalid
         )
         return ExecutionResult(
