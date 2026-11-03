@@ -92,6 +92,7 @@ class ExecutionResult:
     equity_curve: pd.DataFrame
     open_positions: pd.DataFrame
     invalidated_round_trips: pd.DataFrame
+    order_events: pd.DataFrame
     provenance: dict[str, Any]
     status: str
 
@@ -159,7 +160,10 @@ class ExecutionEngine:
         if frame["session"].astype(str).str.upper().eq("UNKNOWN").any():
             raise ValueError("formal execution is blocked for UNKNOWN session rows")
 
-        orders = sorted(list(orders), key=lambda o: (_ts(o.order_time, config.timestamp_timezone), o.order_id or ""))
+        orders = sorted(
+            list(orders),
+            key=lambda o: (_ts(o.order_time, config.timestamp_timezone), o.order_id or "", _canonical_sha(asdict(o))),
+        )
         orders_input = list(orders)
         fills: list[dict[str, Any]] = []
         rejects: list[dict[str, Any]] = []
@@ -167,7 +171,8 @@ class ExecutionEngine:
         invalid: list[dict[str, Any]] = []
         lots: dict[tuple[str, str], list[dict[str, Any]]] = {}
         cash = float(config.initial_cash)
-        target_positions: dict[tuple[str, str, str], float] = {}
+        filled_positions: dict[tuple[str, str, str], float] = {}
+        order_events: list[dict[str, Any]] = []
         assumptions = ["FIFO lot matching", "orders execute at bar open for market orders", "end-of-data positions remain open"]
 
         # Build each order's candidate bar set first, then advance all candidate
@@ -208,7 +213,7 @@ class ExecutionEngine:
                     matching = matching.iloc[0:0]
                 else:
                     expiry = pd.Timestamp(session_ends.min())
-                    matching = matching[matching["bar_start"] <= expiry]
+                    matching = matching[matching["bar_start"] < expiry]
 
             records.append({
                 "idx": order_idx, "oid": oid, "order": order,
@@ -217,6 +222,10 @@ class ExecutionEngine:
                 "expiry": expiry,
                 "candidate_rows": {pd.Timestamp(row["bar_start"]): row for _, row in matching.iterrows()},
                 "last_reason": "UNFILLED_AT_END_OF_DATA", "done": False,
+                "activated": False,
+                "side": order.side if order.target_position is None else None,
+                "qty": float(order.quantity) if order.quantity is not None else None,
+                "signed_remaining": 0.0,
             })
 
         bars_by_time: dict[pd.Timestamp, dict[tuple[str, str, str], pd.Series]] = {}
@@ -224,31 +233,81 @@ class ExecutionEngine:
             ts = pd.Timestamp(bar["bar_start"])
             bars_by_time.setdefault(ts, {})[(bar["symbol"], bar["market"], bar["contract"])] = bar
 
-        for event_ts in sorted(bars_by_time):
-            rows_at_time = bars_by_time[event_ts]
-            live = sorted(
-                (record for record in records
-                 if not record["done"] and record["order_time"] <= event_ts
-                 and (record["expiry"] is None or event_ts <= record["expiry"])
-                 and event_ts in record["candidate_rows"]),
-                key=lambda record: (record["order_time"], record["order"].order_id or ""),
-            )
+        event_times = set(bars_by_time)
+        event_times.update(record["order_time"] for record in records)
+        event_times.update(record["expiry"] for record in records if record["expiry"] is not None)
+        for event_ts in sorted(event_times):
+            for record in records:
+                if not record["done"] and record["expiry"] is not None and record["expiry"] <= event_ts:
+                    rejects.append({"order_id": record["oid"], "bar_ts": None,
+                        "expiry_ts": record["expiry"], "reason": "ORDER_EXPIRED",
+                        "detail": "DAY order expired at the first session close after order_time"})
+                    order_events.append({"order_id": record["oid"], "event_ts": event_ts,
+                        "event": "ORDER_EXPIRED", "reason_code": "TIF_EXPIRY"})
+                    record["done"] = True
+                    record["signed_remaining"] = 0.0
+
+            activating = sorted((record for record in records
+                if not record["done"] and not record["activated"] and record["order_time"] == event_ts),
+                key=lambda record: (record["order"].order_id or "", _canonical_sha(asdict(record["order"]))))
+            for record in activating:
+                order = record["order"]
+                target_key = record["target_key"]
+                if target_key is None:
+                    record["activated"] = True
+                    record["signed_remaining"] = float(order.quantity) if order.side == "BUY" else -float(order.quantity)
+                    order_events.append({"order_id": record["oid"], "event_ts": event_ts,
+                        "event": "ORDER_ACTIVATED", "reason_code": "EXPLICIT_QUANTITY_INDEPENDENT"})
+                    continue
+                filled_position = filled_positions.get(target_key, 0.0)
+                pending_targets = [prior for prior in records
+                    if prior is not record and prior["activated"] and not prior["done"]
+                    and prior["target_key"] == target_key]
+                pending_signed = sum(prior["signed_remaining"] for prior in pending_targets)
+                delta = float(order.target_position) - (filled_position + pending_signed)
+                for prior in pending_targets:
+                    order_events.append({
+                        "order_id": prior["oid"], "related_order_id": record["oid"],
+                        "event_ts": event_ts, "event": "TARGET_ORDER_REBALANCED",
+                        "reason_code": "NEWER_TARGET_RECONCILES_LIVE_INTENT",
+                        "pending_signed_qty": prior["signed_remaining"],
+                        "action": "RETAIN_PENDING_FOR_ORACLE_COMPATIBILITY",
+                    })
+                record["activated"] = True
+                if abs(delta) < 1e-12:
+                    record["done"] = True
+                    order_events.append({"order_id": record["oid"], "event_ts": event_ts,
+                        "event": "TARGET_ORDER_NOOP", "reason_code": "TARGET_ALREADY_REPRESENTED",
+                        "desired_target": float(order.target_position), "filled_position": filled_position,
+                        "pending_signed_qty": pending_signed})
+                    continue
+                side = "BUY" if delta > 0 else "SELL"
+                if side != order.side:
+                    rejects.append({"order_id": record["oid"], "reason": "TARGET_SIDE_MISMATCH",
+                        "detail": f"target requires {side}"})
+                    order_events.append({"order_id": record["oid"], "event_ts": event_ts,
+                        "event": "ORDER_REJECTED", "reason_code": "TARGET_SIDE_MISMATCH"})
+                    record["done"] = True
+                    continue
+                record["side"], record["qty"], record["signed_remaining"] = side, abs(delta), delta
+                order_events.append({"order_id": record["oid"], "event_ts": event_ts,
+                    "event": "TARGET_ORDER_ACTIVATED",
+                    "reason_code": "PENDING_TARGET_INCLUDED" if abs(pending_signed) > 1e-12 else "FILLED_POSITION_ONLY",
+                    "desired_target": float(order.target_position), "filled_position": filled_position,
+                    "pending_signed_qty": pending_signed, "projected_position": filled_position + pending_signed,
+                    "signed_delta": delta})
+
+            live = sorted((record for record in records
+                if not record["done"] and record["activated"] and event_ts in record["candidate_rows"]),
+                key=lambda record: (record["order_time"], record["order"].order_id or "",
+                    _canonical_sha(asdict(record["order"]))))
             for record in live:
                 order = record["order"]
                 oid = record["oid"]
                 bar = record["candidate_rows"][event_ts]
                 key = (order.symbol, order.contract)
                 target_key = record["target_key"]
-                if target_key is not None:
-                    current_target = target_positions.get(target_key, 0.0)
-                    delta = float(order.target_position) - current_target
-                    if abs(delta) < 1e-12:
-                        record["done"] = True
-                        continue
-                    side = "BUY" if delta > 0 else "SELL"
-                    qty = abs(delta)
-                else:
-                    side, qty = order.side, float(order.quantity)
+                side, qty = record["side"], record["qty"]
                 if side != order.side:
                     rejects.append({"order_id": oid, "reason": "TARGET_SIDE_MISMATCH", "detail": f"target requires {side}"})
                     record["done"] = True
@@ -287,6 +346,7 @@ class ExecutionEngine:
                     # ordinary bar-level rejections until fill or expiry.
                     if order.time_in_force == "NEXT_BAR" or reason == "BAR_IN_EXCLUSION_WINDOW":
                         record["done"] = True
+                        record["signed_remaining"] = 0.0
                     continue
 
                 if order.order_type == "LIMIT":
@@ -324,10 +384,12 @@ class ExecutionEngine:
                 }
                 fills.append(fill)
                 record["done"] = True
-                if target_key is not None:
-                    target_positions[target_key] = float(order.target_position)
-
+                record["signed_remaining"] = 0.0
                 signed_qty = qty if side == "BUY" else -qty
+                filled_key = (order.strategy_id, order.symbol, order.contract)
+                filled_positions[filled_key] = filled_positions.get(filled_key, 0.0) + signed_qty
+                order_events.append({"order_id": oid, "event_ts": bar["bar_start"],
+                    "event": "ORDER_FILLED", "reason_code": "FULL_FILL", "side": side, "qty": qty})
                 lots.setdefault(key, [])
                 remaining = qty
                 # Consume opposite lots FIFO; each pair closes only within the same contract.
@@ -385,15 +447,6 @@ class ExecutionEngine:
                     cash -= float((fee + tax) * (Decimal("1") - Decimal(str(opened)) / Decimal(str(qty))))
                 else:
                     cash -= float(fee + tax)
-
-            for record in records:
-                if (not record["done"] and record["order"].time_in_force == "DAY"
-                        and record["expiry"] is not None and event_ts >= record["expiry"]):
-                    rejects.append({
-                        "order_id": record["oid"], "bar_ts": record["expiry"],
-                        "reason": "ORDER_EXPIRED", "detail": "DAY order reached its first session close after order_time",
-                    })
-                    record["done"] = True
 
         for record in records:
             if not record["done"]:
@@ -502,5 +555,6 @@ class ExecutionEngine:
         return ExecutionResult(
             fills=pd.DataFrame(fills), round_trips=pd.DataFrame(trips), rejections=pd.DataFrame(rejects),
             equity_curve=eq, open_positions=open_df, invalidated_round_trips=pd.DataFrame(invalid),
+            order_events=pd.DataFrame(order_events),
             provenance=provenance, status="RESEARCH_ONLY" if not formal_eligible else "FORMAL_ELIGIBLE",
         )
