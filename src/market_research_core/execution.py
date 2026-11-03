@@ -140,6 +140,8 @@ class ExecutionEngine:
         frame = frame.sort_values(["bar_start", "symbol", "contract"], kind="stable").reset_index(drop=True)
         if frame.duplicated(["symbol", "contract", "bar_start"]).any():
             raise ValueError("duplicate bars for symbol/contract/bar_start")
+        if frame[["bar_start", "bar_end", "available_at", "session_open", "session_close"]].isna().any().any():
+            raise ValueError("execution timing/session fields contain UNKNOWN values")
         if (frame["bar_end"] <= frame["bar_start"]).any():
             raise ValueError("bar_end must be after bar_start")
         if (frame["available_at"] < frame["bar_end"]).any():

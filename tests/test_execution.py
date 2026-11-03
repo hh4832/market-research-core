@@ -37,3 +37,8 @@ def test_fifo_and_open_position():
 def test_exclusion_invalidates_crossing_trade():
  r=ExecutionEngine().run(bars(),[order("2024-01-02 09:00","BUY"),order("2024-01-02 09:03","SELL")],cost_profile=profile(),config=config(exclusion_windows=(("2024-01-02T09:02:00+08:00","2024-01-02T09:03:00+08:00","posthoc"),)))
  assert len(r.invalidated_round_trips)==1 and r.round_trips.empty
+
+def test_unknown_execution_timing_fails_closed():
+ f=bars(); f.loc[0,"bar_start"]=pd.NaT
+ with pytest.raises(ValueError,match="UNKNOWN"):
+  ExecutionEngine().run(f,[order("2024-01-02 09:00","BUY")],cost_profile=profile(),config=config())
