@@ -279,12 +279,13 @@ class ExecutionEngine:
 
                 if reason is not None:
                     record["last_reason"] = reason
-                    # NEXT_BAR has a single candidate; DAY remains live through
-                    # the candidates in its selected session, matching v1's
-                    # existing behavior until the dedicated TIF correction.
-                    if order.time_in_force == "NEXT_BAR" or reason in ("ORDER_EXPIRED", "BAR_IN_EXCLUSION_WINDOW"):
-                        rejects.append({"order_id": oid, "bar_ts": bar["bar_start"], "reason": reason,
-                                        "detail": "no eligible execution bar within TIF"})
+                    rejects.append({
+                        "order_id": oid, "bar_ts": bar["bar_start"], "reason": reason,
+                        "detail": "candidate bar was not eligible for this order",
+                    })
+                    # NEXT_BAR has a single candidate. DAY keeps waiting after
+                    # ordinary bar-level rejections until fill or expiry.
+                    if order.time_in_force == "NEXT_BAR" or reason == "BAR_IN_EXCLUSION_WINDOW":
                         record["done"] = True
                     continue
 
@@ -305,12 +306,12 @@ class ExecutionEngine:
                 if cost_profile.instrument_type == "FUTURES" and config.initial_margin_per_contract is not None:
                     required_margin = abs(resulting_net) * config.initial_margin_per_contract
                     if required_margin > cash + 1e-9:
-                        rejects.append({"order_id": oid, "reason": "INSUFFICIENT_MARGIN",
+                        rejects.append({"order_id": oid, "bar_ts": bar["bar_start"], "reason": "INSUFFICIENT_MARGIN",
                                         "detail": f"required={required_margin:.2f}, available={cash:.2f}"})
                         record["done"] = True
                         continue
                 if config.max_gross_notional is not None and abs(resulting_net * fill_price * multiplier) > config.max_gross_notional:
-                    rejects.append({"order_id": oid, "reason": "RISK_LIMIT",
+                    rejects.append({"order_id": oid, "bar_ts": bar["bar_start"], "reason": "RISK_LIMIT",
                                     "detail": f"gross_notional={abs(resulting_net * fill_price * multiplier):.2f}"})
                     record["done"] = True
                     continue
