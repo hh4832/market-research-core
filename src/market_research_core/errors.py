@@ -3,9 +3,12 @@ class DataAccessError(RuntimeError):
 
 
 class SnapshotMismatch(DataAccessError):
-    """The selected snapshot does not match the pinned release."""
+    """The selected snapshot does not match a pinned release."""
 
 
 class PolicyViolation(DataAccessError):
-    """A request violates an instrument or snapshot policy."""
+    """A request violates an approved data-use policy."""
 
+
+class BacktestRejected(DataAccessError):
+    """A backtest cannot continue without inventing data or execution."""
