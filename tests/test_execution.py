@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import pandas as pd
 import pytest
 from market_research_core.costs import CostProfile, calculate_costs
@@ -89,3 +91,18 @@ def test_formal_status_rejects_short_producer_sha():
  r=ExecutionEngine().run(bars(),[order("2024-01-02 09:00","BUY")],cost_profile=p,
    config=config(spec_sha256="c"*64,dataset_producer_sha="20eba73",dataset_verdict="SCOPED_GO"))
  assert r.status=="RESEARCH_ONLY"
+
+def test_fills_and_position_ledger_follow_execution_time_not_order_creation_time():
+ f=bars()
+ f.loc[[0,1],"buy_execution_eligible"]=False
+ f.loc[[0,1],"buy_execution_rejection_reason"]="LIMIT_UP_LOCKED_BUY"
+ delayed_buy=order("2024-01-02 09:00","BUY",tif="DAY")
+ earlier_fill_sell=replace(order("2024-01-02 09:01","SELL"),
+   signal_available_at=pd.Timestamp("2024-01-02 09:01",tz="Asia/Taipei"),
+   order_time=pd.Timestamp("2024-01-02 09:01",tz="Asia/Taipei"))
+ r=ExecutionEngine().run(f,[delayed_buy,earlier_fill_sell],cost_profile=profile(),
+   config(permitted_usage_scope="RESEARCH_ONLY"))
+ fill_times=list(r.fills.exec_ts)
+ assert fill_times==sorted(fill_times)
+ assert all(pd.Timestamp(trip.entry_ts)<=pd.Timestamp(trip.exit_ts) for trip in r.round_trips.itertuples())
+ assert r.round_trips.iloc[0].side=="SHORT"
