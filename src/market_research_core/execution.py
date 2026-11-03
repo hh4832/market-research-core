@@ -5,6 +5,7 @@ The engine consumes normalized bars and explicit orders. It never generates sign
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
+from decimal import Decimal
 from datetime import datetime
 from hashlib import sha256
 import json
@@ -111,8 +112,8 @@ def _ts(value: Any, timezone: str) -> pd.Timestamp:
     return ts
 
 
-def _money(value: float) -> float:
-    return float(round(value + 1e-10, 2))
+def _money(value: float | Decimal) -> float:
+    return float(value)
 
 
 def _in_window(ts: pd.Timestamp, windows: tuple[tuple[Any, Any, str], ...], timezone: str) -> str | None:
@@ -290,7 +291,8 @@ class ExecutionEngine:
                 if order.order_type == "LIMIT":
                     fill_price = min(fill_price, float(order.limit_price)) if side == "BUY" else max(fill_price, float(order.limit_price))
                 fee, tax = calculate_costs(fill_price, qty, side, cost_profile)
-                fee, tax = _money(fee * config.cost_multiplier), _money(tax * config.cost_multiplier)
+                cost_multiplier = Decimal(str(config.cost_multiplier))
+                fee, tax = _money(fee * cost_multiplier), _money(tax * cost_multiplier)
                 signed_delta = qty if side == "BUY" else -qty
                 current_net = sum(lot["signed_qty"] for lot in lots.get(key, []))
                 resulting_net = current_net + signed_delta
