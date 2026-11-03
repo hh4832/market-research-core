@@ -69,3 +69,41 @@ Python 3.11 GitHub Actions is the authoritative test environment. The final head
 3. **Cost and execution approval:** Account owner supplies actual pricing evidence or research lead approves explicitly assumed components; research lead approves volume participation and side-specific execution policy.
 
 Until these items are resolved, only bounded, read-only RESEARCH_ONLY diagnostics are in scope. There was no real-data execution probe, so no Drive archive or performance result exists.
+
+
+## M3-A.2 bounded timestamp and closing-auction verification
+
+### Evidence reviewed
+
+- Pinned snapshot and Drive file ID remain `20261101_205431_06359faf7ef4_IBKR_FINAL_GATE_FULL` / `1B_2WyFRHXUzwg3C1BR7GLApGl722Ezli`; Drive metadata reports `tsm_normalized.parquet` size 29,363,599 bytes. No data file or FINAL GATE artifact was changed.
+- The existing daily RTH coverage CSV reports 390/390 candidate rows on many normal sessions, but labels them `COVERAGE_OK_LABEL_UNVERIFIED`; it does not expose the actual first/last bar timestamps.
+- At producer SHA `06359faf7ef4b8ff702a7ab1a6d07521d3b68f28`, `src/ibkr_qc/validate.py::daily_coverage` explicitly says it assumes bar-start timestamps and that coverage is not label validation. It computes candidates in `[market_open, market_close)`; the resulting 390 count is therefore not independent evidence of the timestamp label.
+- The read-only Drive connector can fetch text diagnostics and report file metadata, but it has no row/column projection API for Parquet. Fetching the binary file through this interface would transfer the entire 29,363,599-byte snapshot, outside the requested bounded access. No raw Parquet row was claimed or fabricated.
+
+### Verdict
+
+- **First RTH bar / last RTH bar / 390 actual bars on the seven requested dates:** not reverified in this environment. The prior report of 09:30–15:59 is not accepted as evidence because it lacks reproducible row output.
+- **Timestamp label:** UNKNOWN. The producer's coverage implementation is explicitly provisional. Neither UTC epoch conversion nor IBKR's documented `formatDate` and `useRTH` parameters specify bar start/end semantics.
+- **Closing-auction attribution:** UNKNOWN. The fixed OHLCV Parquet has no trade-condition or individual trade-time evidence. A 15:59 or 16:00 volume spike cannot identify the auction print. No independent official closing-price series was available for comparison.
+- **RTH close boundary:** FAIL-CLOSED. Do not simulate a closing-auction order or treat the unverified close as an executable auction price. Keep ETH fills disabled.
+
+### Reproducible bounded extraction
+
+Added `src/market_research_core/ibkr_tsm_audit.py`. It reads only `timestamp_utc, open, high, low, close, volume` for the seven predeclared New York dates using a PyArrow dataset predicate. It writes:
+- `bounded_timestamp_evidence.csv`: first/last timestamps and counts under both start-label and end-label hypotheses, per-day missing-minute counts, pre/after-hours timestamp observations, and normal-session status.
+- `closing_auction_comparison.csv`: actual source rows at 15:58, 15:59, 16:00, 16:01 and 16:02 NY time, with OHLCV and volume ratios. Auction attribution and official-close comparison remain explicitly UNKNOWN without those independent sources.
+- `run_info.json`: fixed snapshot ID, producer SHA, Drive file ID, research commit SHA, selected dates and columns.
+
+From a Colab session with the existing Drive folder mounted, check out this PR branch, install the repository's declared dependencies, then run:
+
+```bash
+python -m market_research_core.ibkr_tsm_audit \
+  --parquet "/content/drive/MyDrive/<existing snapshot path>/tsm_normalized.parquet" \
+  --output-dir "/content/drive/MyDrive/Quant_Research/market-research-core/M3A2_<new-run-id>"
+```
+
+The output directory must be new or empty; the script refuses to overwrite results. Its pattern verdict is intentionally limited to `STRONGLY_SUPPORTED_NOT_CONFIRMED` or `UNKNOWN`; a full 390-row grid cannot independently confirm timestamp semantics. Synthetic tests cover both start/end patterns, the ambiguous 16:00 row, missing requested dates, and auction-data limitations. No real-data output CSV is present because this environment cannot execute a filtered read of the private Drive Parquet without transferring the whole file.
+
+### Smallest remaining evidence
+
+One bounded run of this committed script against the existing mounted Parquet, preserving both CSVs and `run_info.json`, is required to establish the seven dates' actual first/last rows. To attribute a closing auction, the same date sample must additionally include a trade-level source with timestamps and sale/auction conditions (or an authoritative provider mapping of the auction print to its minute bar) and an independent official close. Without that trade-level evidence, auction attribution remains UNKNOWN even if the 15:59/16:00 OHLCV rows are present.
