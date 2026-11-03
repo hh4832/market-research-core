@@ -15,7 +15,7 @@ from typing import Any, Iterable, Literal
 
 import pandas as pd
 
-from .costs import CostProfile, calculate_costs, adverse_fill_price
+from .costs import CostProfile, calculate_cost_components, adverse_fill_price
 
 
 @dataclass(frozen=True)
@@ -58,6 +58,7 @@ class ExecutionConfig:
     session_semantics: Literal["CONFIRMED", "UNKNOWN"]
     timestamp_timezone: str
     same_timestamp_open_assumption: bool = False
+    available_at_policy: Literal["OBSERVED", "BAR_END_STRICT_LATER", "UNKNOWN"] = "OBSERVED"
     initial_margin_per_contract: float | None = None
     max_gross_notional: float | None = None
     exclusion_windows: tuple[tuple[Any, Any, str], ...] = ()
@@ -80,6 +81,10 @@ class ExecutionConfig:
             raise ValueError("cost_multiplier must be finite and non-negative")
         if self.bar_label == "UNKNOWN" or self.session_semantics == "UNKNOWN":
             raise ValueError("formal execution is blocked when bar label or session semantics are UNKNOWN")
+        if self.available_at_policy not in {"OBSERVED", "BAR_END_STRICT_LATER", "UNKNOWN"}:
+            raise ValueError("unsupported available_at_policy")
+        if self.available_at_policy == "BAR_END_STRICT_LATER" and self.same_timestamp_open_assumption:
+            raise ValueError("BAR_END_STRICT_LATER forbids same-timestamp bar-open execution")
         if self.timestamp_timezone != "Asia/Taipei" and self.timestamp_timezone != "America/New_York" and not self.timestamp_timezone:
             raise ValueError("timestamp_timezone must be explicit")
 
@@ -143,6 +148,10 @@ class ExecutionEngine:
         if missing:
             raise ValueError(f"bars missing required execution columns: {sorted(missing)}")
         frame = bars.copy()
+        if "available_at_policy" in frame.columns:
+            row_policies = set(frame["available_at_policy"].dropna().astype(str))
+            if row_policies and row_policies != {config.available_at_policy}:
+                raise ValueError("available_at_policy does not match bar provenance")
         frame["bar_start"] = pd.to_datetime(frame["bar_start"], utc=True).dt.tz_convert(config.timestamp_timezone)
         frame["bar_end"] = pd.to_datetime(frame["bar_end"], utc=True).dt.tz_convert(config.timestamp_timezone)
         frame["available_at"] = pd.to_datetime(frame["available_at"], utc=True).dt.tz_convert(config.timestamp_timezone)
@@ -157,6 +166,8 @@ class ExecutionEngine:
             raise ValueError("bar_end must be after bar_start")
         if (frame["available_at"] < frame["bar_end"]).any():
             raise ValueError("available_at cannot precede bar_end")
+        if config.available_at_policy == "BAR_END_STRICT_LATER" and not frame["available_at"].eq(frame["bar_end"]).all():
+            raise ValueError("BAR_END_STRICT_LATER requires available_at == bar_end")
         if frame["session"].astype(str).str.upper().eq("UNKNOWN").any():
             raise ValueError("formal execution is blocked for UNKNOWN session rows")
 
@@ -174,6 +185,8 @@ class ExecutionEngine:
         filled_positions: dict[tuple[str, str, str], float] = {}
         order_events: list[dict[str, Any]] = []
         assumptions = ["FIFO lot matching", "orders execute at bar open for market orders", "end-of-data positions remain open"]
+        if config.available_at_policy == "BAR_END_STRICT_LATER":
+            assumptions.append("available_at is conservatively modeled at bar_end; actual historical publication latency is UNKNOWN; equal-time next-bar opens are excluded")
 
         # Build each order's candidate bar set first, then advance all candidate
         # orders on the shared bar_start timeline. State changes happen only at
@@ -320,6 +333,8 @@ class ExecutionEngine:
                     reason = "BAR_NOT_ELIGIBLE"
                 elif float(bar["volume"]) <= 0:
                     reason = "ZERO_VOLUME_BAR"
+                elif cost_profile.volume_participation_cap is not None and qty > float(bar["volume"]) * cost_profile.volume_participation_cap:
+                    reason = "VOLUME_PARTICIPATION_EXCEEDED"
                 else:
                     eligible_col = "buy_execution_eligible" if side == "BUY" else "sell_execution_eligible"
                     if not bool(bar[eligible_col]):
@@ -356,9 +371,9 @@ class ExecutionEngine:
                 fill_price = adverse_fill_price(raw_price, side, cost_profile, config.cost_multiplier)
                 if order.order_type == "LIMIT":
                     fill_price = min(fill_price, float(order.limit_price)) if side == "BUY" else max(fill_price, float(order.limit_price))
-                fee, tax = calculate_costs(fill_price, qty, side, cost_profile)
+                fee, tax, regulatory_fee = calculate_cost_components(fill_price, qty, side, cost_profile)
                 cost_multiplier = Decimal(str(config.cost_multiplier))
-                fee, tax = fee * cost_multiplier, tax * cost_multiplier
+                fee, tax, regulatory_fee = fee * cost_multiplier, tax * cost_multiplier, regulatory_fee * cost_multiplier
                 signed_delta = qty if side == "BUY" else -qty
                 current_net = sum(lot["signed_qty"] for lot in lots.get(key, []))
                 resulting_net = current_net + signed_delta
@@ -379,6 +394,7 @@ class ExecutionEngine:
                     "order_id": oid, "symbol": order.symbol, "market": order.market,
                     "contract": order.contract, "exec_ts": bar["bar_start"], "side": side,
                     "qty": qty, "fill_price": fill_price, "fee": fee, "tax": tax,
+                    "regulatory_fee": regulatory_fee,
                     "strategy_id": order.strategy_id, "experiment_id": order.experiment_id,
                     "session": bar["session"], "execution_assumption": "SAME_TIMESTAMP_BAR_OPEN" if bar["bar_start"] == record["available"] else "NEXT_ELIGIBLE_BAR_OPEN",
                 }
@@ -406,10 +422,13 @@ class ExecutionEngine:
                     exit_fee_alloc = fee * matched_d / qty_d
                     entry_tax_alloc = lot["tax_remaining"] * matched_d / entry_remaining_d
                     exit_tax_alloc = tax * matched_d / qty_d
-                    net_d = gross_d - entry_fee_alloc - exit_fee_alloc - entry_tax_alloc - exit_tax_alloc
+                    entry_reg_alloc = lot["regulatory_fee_remaining"] * matched_d / entry_remaining_d
+                    exit_reg_alloc = regulatory_fee * matched_d / qty_d
+                    net_d = (gross_d - entry_fee_alloc - exit_fee_alloc - entry_tax_alloc - exit_tax_alloc
+                             - entry_reg_alloc - exit_reg_alloc)
                     gross = float(gross_d)
                     if cost_profile.instrument_type == "FUTURES":
-                        cash += gross - float(exit_fee_alloc) - float(exit_tax_alloc)
+                        cash += gross - float(exit_fee_alloc) - float(exit_tax_alloc) - float(exit_reg_alloc)
                     else:
                         cash += math.copysign(fill_price * matched, lot["signed_qty"])
                     start_ts = lot["entry_ts"]
@@ -426,27 +445,29 @@ class ExecutionEngine:
                     lot["signed_qty"] -= math.copysign(matched, lot["signed_qty"])
                     lot["fee_remaining"] -= entry_fee_alloc
                     lot["tax_remaining"] -= entry_tax_alloc
+                    lot["regulatory_fee_remaining"] -= entry_reg_alloc
                     remaining -= matched
                     if abs(lot["signed_qty"]) < 1e-12:
                         lots[key].pop(0)
                 if remaining > 1e-12:
                     open_signed = math.copysign(remaining, signed_qty)
                     if cost_profile.instrument_type == "FUTURES":
-                        cash -= float((fee + tax) * Decimal(str(remaining)) / Decimal(str(qty)))
+                        cash -= float((fee + tax + regulatory_fee) * Decimal(str(remaining)) / Decimal(str(qty)))
                     else:
                         cash -= open_signed * fill_price * remaining
                     lots[key].append({
                         "signed_qty": open_signed, "entry_price": fill_price, "entry_ts": bar["bar_start"],
                         "fee_remaining": fee * Decimal(str(remaining)) / Decimal(str(qty)), "tax_remaining": tax * Decimal(str(remaining)) / Decimal(str(qty)),
+                        "regulatory_fee_remaining": regulatory_fee * Decimal(str(remaining)) / Decimal(str(qty)),
                         "strategy_id": order.strategy_id, "experiment_id": order.experiment_id,
                         "market": order.market, "symbol": order.symbol, "contract": order.contract,
                     })
                 # Futures opening costs are charged at entry; equity costs are charged here as cash expenses.
                 if cost_profile.instrument_type == "FUTURES":
                     opened = max(0.0, remaining)
-                    cash -= float((fee + tax) * (Decimal("1") - Decimal(str(opened)) / Decimal(str(qty))))
+                    cash -= float((fee + tax + regulatory_fee) * (Decimal("1") - Decimal(str(opened)) / Decimal(str(qty))))
                 else:
-                    cash -= float(fee + tax)
+                    cash -= float(fee + tax + regulatory_fee)
 
         for record in records:
             if not record["done"]:
@@ -503,7 +524,7 @@ class ExecutionEngine:
                         queue.pop(0)
                 if remaining > 1e-12:
                     queue.append({"signed_qty": math.copysign(remaining, signed), "entry_price": item["fill_price"]})
-                mark_cash -= float(item["fee"] + item["tax"])
+                mark_cash -= float(item["fee"] + item["tax"] + item["regulatory_fee"])
             unrealized = 0.0
             market_value = 0.0
             margin = 0.0
@@ -538,13 +559,18 @@ class ExecutionEngine:
             "cost_multiplier": config.cost_multiplier, "seed": config.seed,
             "window_start": config.window_start, "window_end": config.window_end,
             "bar_label": config.bar_label, "session_semantics": config.session_semantics,
-            "timestamp_timezone": config.timestamp_timezone, "assumptions": assumptions,
+            "timestamp_timezone": config.timestamp_timezone, "available_at_policy": config.available_at_policy,
+            "assumptions": assumptions,
             "permitted_usage_scope": config.permitted_usage_scope,
         }
         formal_eligible = (
             config.permitted_usage_scope == "BACKTEST"
+            and config.available_at_policy == "OBSERVED"
             and cost_profile.approval_status == "APPROVED"
-            and all(basis != "ASSUMED" for basis in cost_profile.component_basis.values())
+            and all(basis in {"OFFICIAL", "BROKER_ACTUAL"} for basis in cost_profile.component_basis.values())
+            and all(status == "APPROVED" for status in (
+                cost_profile.component_approval_status.values() or [cost_profile.approval_status]
+            ))
             and config.dataset_verdict in {"GO", "SCOPED_GO"}
             and bool(re.fullmatch(r"[0-9a-fA-F]{40}", config.core_commit_sha))
             and bool(config.dataset_snapshot_id and config.dataset_snapshot_id != "UNKNOWN")
