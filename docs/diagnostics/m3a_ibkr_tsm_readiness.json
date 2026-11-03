@@ -1,23 +1,25 @@
 {
-  "schema_version": "1.0.0",
-  "gate_id": "M3-A-IBKR-TSM",
+  "schema_version": "1.1.0",
+  "gate_id": "M3-A.1-IBKR-TSM",
   "decision": {
+    "scope": "SCOPED_GO",
+    "allowed": "BOUNDED_READ_ONLY_RESEARCH_DIAGNOSTICS",
     "formal_execution": "NO_GO",
-    "bounded_data_diagnostics": "SCOPED_GO_RESEARCH_ONLY"
+    "real_data_execution_probe": "NOT_RUN"
   },
-  "core_base_sha": "bf01fa92bc95f9fc8b04038875c813f6cd30ad99",
+  "core": {
+    "base_sha": "bf01fa92bc95f9fc8b04038875c813f6cd30ad99",
+    "feature_branch": "feature/m3a-ibkr-tsm-readiness",
+    "pr": "https://github.com/hh4832/market-research-core/pull/3"
+  },
   "dataset": {
     "snapshot_id": "20261101_205431_06359faf7ef4_IBKR_FINAL_GATE_FULL",
     "producer_sha": "06359faf7ef4b8ff702a7ab1a6d07521d3b68f28",
     "instrument": "TSM",
-    "quality_verdict": "GO",
-    "rows": 2193372,
-    "errors": 0,
-    "unresolved_minutes": 0,
-    "excluded_candidates": 0
-  },
-  "timestamp_session": {
-    "source_timestamp_timezone": "UTC",
+    "preexisting_quality_verdict": "GO",
+    "preexisting_rows": 2193372,
+    "history_gate_rerun": false,
+    "full_download": false,
     "source_request": {
       "bar_size": "1 min",
       "what_to_show": "TRADES",
@@ -25,49 +27,86 @@
       "format_date": 2,
       "keep_up_to_date": false
     },
-    "coverage": "RTH_AND_AVAILABLE_ETH",
+    "coverage": "RTH_AND_AVAILABLE_EXTENDED_HOURS; NOT_24_HOUR"
+  },
+  "timestamp_availability": {
+    "source_timezone": "UTC_EPOCH_CONVERSION",
     "timestamp_label": "UNKNOWN",
-    "bar_start": "UNKNOWN",
-    "bar_end": "UNKNOWN",
-    "available_at": "UNKNOWN",
-    "per_bar_session_mask": "UNKNOWN",
-    "calendar": "NYSE via pandas_market_calendars; exact dependency version not pinned in snapshot",
-    "daylight_saving": "UTC source; producer converts to America/New_York using IANA timezone",
-    "early_closes": "NYSE schedule used; exact dependency version not pinned in snapshot"
-  },
-  "execution_eligibility": {
-    "buy": false,
-    "sell": false,
-    "rejection_reason": "TIMESTAMP_LABEL_OR_SESSION_UNKNOWN",
-    "earliest_execution": "BLOCKED_UNTIL_BAR_AVAILABILITY_AND_BOUNDARIES_CONFIRMED",
-    "same_bar_execution": false,
-    "market_status": "RESEARCH_ONLY"
-  },
-  "cost_profile": {
-    "id": "ibkr_us_equity",
-    "version": "0.1.0",
-    "sha256": "50149cd2198a49ddb9acadff536f6765e7d938e62bd47e3c40089a561c0f97e5",
-    "approval_status": "DRAFT",
-    "components": {
-      "commission_per_share_usd": {"value": 0.005, "basis": "ASSUMED"},
-      "minimum_commission_usd": {"value": 1.0, "basis": "ASSUMED"},
-      "slippage_bps": {"value": 2, "basis": "ASSUMED"},
-      "spread": {"value": null, "basis": "ASSUMED", "status": "UNMODELED"},
-      "sell_side_regulatory_fees_or_taxes": {"value": null, "basis": "ASSUMED", "status": "UNKNOWN_NOT_ZERO"},
-      "volume_participation_cap": {"value": null, "basis": "ASSUMED", "status": "UNKNOWN"}
+    "applies_to": "PINNED_TSM_ONE_MINUTE_TRADES_PATH_ONLY",
+    "bar_start": "UNKNOWN_NOT_DERIVED",
+    "bar_end": "UNKNOWN_NOT_DERIVED",
+    "observed_available_at": "UNKNOWN_NOT_RECORDED",
+    "conservative_policy": {
+      "name": "BAR_END_STRICT_LATER",
+      "meaning": "Model information available at completed bar_end; execution requires a later eligible bar_start",
+      "is_observed_ibkr_latency": false,
+      "same_timestamp_open_allowed": false,
+      "approval": "PENDING_RESEARCH_OWNER"
     },
-    "cost_multiplier_sensitivity_proposed": [1, 2, 3],
-    "profile_approval_evidence": null
+    "minimum_missing_evidence": [
+      "Exact downloader revision and acquisition receipt for pinned snapshot",
+      "Bounded bar-to-underlying-trade interval correlation or authoritative IBKR timestamp semantics",
+      "Owner decision on use of conservative availability policy"
+    ]
   },
-  "probe": {
-    "executed": false,
-    "reason": [
-      "TIMESTAMP_LABEL_UNKNOWN",
-      "AVAILABLE_AT_UNKNOWN",
-      "SESSION_MASK_UNKNOWN",
-      "COST_PROFILE_DRAFT",
-      "CORE_COST_SCHEMA_NOT_LOSSLESS_FOR_PER_SHARE_COMMISSION"
+  "session_mask": {
+    "calendar": "NYSE",
+    "package": "pandas-market-calendars",
+    "version": "5.5.0",
+    "timezone": "America/New_York",
+    "labels": ["RTH", "PRE_MARKET", "AFTER_HOURS", "OUTSIDE_SESSION"],
+    "handles_dst_holidays_early_closes": true,
+    "boundary_crossing_bar": "OUTSIDE_SESSION",
+    "missing_bars_filled": false,
+    "default_enabled_session_after_gate": "RTH_ONLY",
+    "eth_enabled": false,
+    "real_snapshot_mask_applied": false,
+    "reason": "TIMESTAMP_LABEL_UNKNOWN"
+  },
+  "eligibility": {
+    "buy_execution_eligible": false,
+    "sell_execution_eligible": false,
+    "rejection_reason": "TIMESTAMP_LABEL_OR_SESSION_UNKNOWN",
+    "same_bar_execution": false,
+    "real_data_execution_engine_allowed": false
+  },
+  "cost_model": {
+    "core_represents": [
+      "PER_SHARE_COMMISSION",
+      "MINIMUM_COMMISSION",
+      "BPS_SLIPPAGE",
+      "HALF_SPREAD_BPS",
+      "SELL_SIDE_REGULATORY_FEE",
+      "VOLUME_PARTICIPATION_CAP"
     ],
-    "archive": "NOT_CREATED_NO_EXECUTION_OUTPUT"
-  }
+    "volume_cap_behavior": "REJECT_FULL_ORDER_IF_CAP_EXCEEDED; PARTIAL_FILLS_UNSUPPORTED",
+    "component_basis_evidence_approval_in_provenance": true,
+    "ibkr_profile_approval": "DRAFT_ASSUMED_APPROVAL_PENDING",
+    "official_or_broker_actual_rates_supplied": false,
+    "formal_cost_approval": false
+  },
+  "validation": {
+    "scope": "TARGETED_SYNTHETIC_REGRESSION_ONLY",
+    "tests": [
+      "unknown timestamp and availability fail closed",
+      "NYSE session labels: RTH, pre-market, after-hours, outside-session",
+      "DST, holiday, early close, and boundary-crossing bars",
+      "START/END mapping equivalence synthetic only",
+      "BAR_END_STRICT_LATER execution timing",
+      "per-share minimum, bps slippage, half spread, sell regulatory fee",
+      "cost ledger flow and provenance",
+      "volume participation cap rejection"
+    ],
+    "oracle_b01_b12_g16_g17_g14b_modified": false,
+    "oracle_rerun": false
+  },
+  "archive": {
+    "created": false,
+    "reason": "NO_REAL_DATA_EXECUTION_OUTPUT"
+  },
+  "blockers": [
+    {"owner": "DATA_PRODUCER_OWNER", "item": "Pinned timestamp label evidence and request receipt"},
+    {"owner": "DATA_OWNER_AND_RESEARCH_OWNER", "item": "Availability policy decision and real row-level session mapping"},
+    {"owner": "ACCOUNT_OWNER_AND_RESEARCH_LEAD", "item": "Cost evidence/approval and side-specific execution policy"}
+  ]
 }
