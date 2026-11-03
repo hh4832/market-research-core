@@ -137,6 +137,7 @@ def test_bar_end_policy_uses_strictly_later_execution_and_is_research_only():
 
 def test_per_share_minimum_bps_spread_and_sell_regulatory_fee():
     p = profile(
+        minimum_commission=1.0,
         equity_commission_per_share=0.005,
         equity_slippage_bps=2,
         half_spread_bps=1,
