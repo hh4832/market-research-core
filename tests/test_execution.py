@@ -132,3 +132,23 @@ def test_unrounded_cost_precision_flows_into_realized_pnl():
  assert abs(float(r.fills.iloc[0].fee)-0.1425)<1e-12
  assert abs(float(r.fills.iloc[1].tax)-0.306)<1e-12
  assert abs(float(r.round_trips.iloc[0].net_pnl)-1.40615)<1e-10
+
+def test_day_tif_survives_to_first_session_close_after_order_time():
+ f=bars()
+ rows=[]
+ for tm,p,v,day in [("2024-01-02 13:30",103,100,"2024-01-02"),
+                     ("2024-01-03 08:55",104,10,"2024-01-03"),
+                     ("2024-01-03 09:00",105,100,"2024-01-03")]:
+  s=pd.Timestamp(tm,tz="Asia/Taipei")
+  rows.append(dict(bar_start=s,bar_end=s+pd.Timedelta(minutes=1),available_at=s+pd.Timedelta(minutes=1),
+    timezone="Asia/Taipei",session="RTH",symbol="2330",market="TW_EQUITY",contract="CASH",
+    open=p,high=p+1,low=p-1,close=p,volume=v,data_exists=True,backtest_eligible=True,
+    buy_execution_eligible=True,sell_execution_eligible=True,execution_rejection_reason="",
+    session_open=pd.Timestamp(day+" 09:00",tz="Asia/Taipei"),
+    session_close=pd.Timestamp(day+" 13:30",tz="Asia/Taipei")))
+ f=pd.concat([f,pd.DataFrame(rows)],ignore_index=True)
+ o=replace(order("2024-01-02 13:30","BUY",tif="DAY"),
+   signal_time=pd.Timestamp("2024-01-02 13:25",tz="Asia/Taipei"),
+   signal_available_at=pd.Timestamp("2024-01-02 13:30",tz="Asia/Taipei"))
+ r=ExecutionEngine().run(f,[o],cost_profile=profile(),config=config())
+ assert r.fills.iloc[0].exec_ts==pd.Timestamp("2024-01-03 09:00",tz="Asia/Taipei")
