@@ -100,8 +100,8 @@ def apply_tsm_session_mask(
     }
 
     sessions: list[str] = []
-    opens: list[pd.Timestamp | pd.NaT] = []
-    closes: list[pd.Timestamp | pd.NaT] = []
+    opens: list[object] = []
+    closes: list[object] = []
     for start, end, ny_date in zip(out["bar_start"], out["bar_end"], ny_dates):
         entry = schedules.get(ny_date.isoformat())
         if entry is None:
