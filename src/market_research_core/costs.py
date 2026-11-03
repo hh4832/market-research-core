@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, ROUND_DOWN, ROUND_FLOOR, ROUND_HALF_UP, ROUND_UP
 from hashlib import sha256
 import json
 import math
@@ -28,8 +28,8 @@ class CostProfile:
     contract_multiplier: float
     tick_size: float
     slippage_ticks: float
-    fee_rounding: Literal["HALF_UP", "UP", "DOWN"]
-    tax_rounding: Literal["HALF_UP", "UP", "DOWN"]
+    fee_rounding: Literal["HALF_UP", "UP", "DOWN", "NONE", "FLOOR_INTEGER"]
+    tax_rounding: Literal["HALF_UP", "UP", "DOWN", "NONE", "FLOOR_INTEGER"]
     component_basis: dict[str, Basis] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -65,19 +65,30 @@ class CostProfile:
                 }.items()}
 
 
-def _round(value: float, mode: str) -> float:
-    rounding = {"HALF_UP": ROUND_HALF_UP, "UP": "ROUND_UP", "DOWN": "ROUND_DOWN"}[mode]
-    return float(Decimal(str(value)).quantize(Decimal("0.01"), rounding=rounding))
+def _round(value: Decimal | float, mode: str) -> Decimal:
+    amount = value if isinstance(value, Decimal) else Decimal(str(value))
+    if mode == "NONE":
+        return amount
+    if mode == "FLOOR_INTEGER":
+        return amount.quantize(Decimal("1"), rounding=ROUND_FLOOR)
+    rounding = {"HALF_UP": ROUND_HALF_UP, "UP": ROUND_UP, "DOWN": ROUND_DOWN}.get(mode)
+    if rounding is None:
+        raise ValueError(f"unsupported rounding mode: {mode}")
+    return amount.quantize(Decimal("0.01"), rounding=rounding)
 
 
-def calculate_costs(price: float, quantity: float, side: str, profile: CostProfile) -> tuple[float, float]:
-    notional = abs(price * quantity * (profile.contract_multiplier if profile.instrument_type == "FUTURES" else 1.0))
+def calculate_costs(price: float, quantity: float, side: str, profile: CostProfile) -> tuple[Decimal, Decimal]:
+    price_value = Decimal(str(price))
+    quantity_value = abs(Decimal(str(quantity)))
+    multiplier = Decimal(str(profile.contract_multiplier if profile.instrument_type == "FUTURES" else 1.0))
+    notional = abs(price_value * quantity_value * multiplier)
     if profile.instrument_type == "FUTURES":
-        fee = profile.futures_fee_per_contract_per_side * quantity
-        tax = notional * profile.futures_transaction_tax_rate
+        fee = Decimal(str(profile.futures_fee_per_contract_per_side)) * quantity_value
+        tax = notional * Decimal(str(profile.futures_transaction_tax_rate))
     else:
-        fee = max(profile.minimum_commission, notional * profile.equity_commission_rate)
-        tax = notional * profile.sell_tax_rate if side == "SELL" else 0.0
+        proportional_fee = notional * Decimal(str(profile.equity_commission_rate))
+        fee = max(Decimal(str(profile.minimum_commission)), proportional_fee)
+        tax = notional * Decimal(str(profile.sell_tax_rate)) if side == "SELL" else Decimal("0")
     return _round(fee, profile.fee_rounding), _round(tax, profile.tax_rounding)
 
 
