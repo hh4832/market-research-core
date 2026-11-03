@@ -19,7 +19,7 @@ from .costs import CostProfile, calculate_costs, adverse_fill_price
 @dataclass(frozen=True)
 class ExecutionOrder:
     symbol: str
-    market: Literal["TW_EQUITY", "IBKR_EQUITY", "TXF"]
+    market: Literal["TW_EQUITY", "IBKR_EQUITY", "IBKR_FUTURES", "TXF"]
     contract: str
     signal_time: Any
     signal_available_at: Any
@@ -167,11 +167,11 @@ class ExecutionEngine:
                 rejects.append({"order_id": oid, "reason": "PIT_VIOLATION", "detail": "signal_available_at/order_time precedes prior information"})
                 order_outcomes[oid] = "REJECTED"
                 continue
-            if order.market == "TXF" and config.initial_margin_per_contract is None:
+            if order.market in ("TXF", "IBKR_FUTURES") and config.initial_margin_per_contract is None:
                 raise ValueError("TXF execution requires explicit initial_margin_per_contract")
-            if order.market == "TXF" and cost_profile.instrument_type != "FUTURES":
+            if order.market in ("TXF", "IBKR_FUTURES") and cost_profile.instrument_type != "FUTURES":
                 raise ValueError("TXF requires a FUTURES CostProfile")
-            if order.market != "TXF" and cost_profile.instrument_type != "EQUITY":
+            if order.market not in ("TXF", "IBKR_FUTURES") and cost_profile.instrument_type != "EQUITY":
                 raise ValueError("equity market requires an EQUITY CostProfile")
 
             key = (order.symbol, order.contract)
@@ -224,7 +224,9 @@ class ExecutionEngine:
                     continue
                 eligible_col = "buy_execution_eligible" if side == "BUY" else "sell_execution_eligible"
                 if not bool(bar[eligible_col]):
-                    reason = str(bar["execution_rejection_reason"] or f"{side}_NOT_ELIGIBLE")
+                    reason_col = f"{side.lower()}_execution_rejection_reason"
+                    reason_value = bar.get(reason_col, bar["execution_rejection_reason"])
+                    reason = str(reason_value) if pd.notna(reason_value) and str(reason_value) else f"{side}_NOT_ELIGIBLE"
                     continue
                 exclusion = _in_window(bar["bar_start"], config.exclusion_windows, config.timestamp_timezone)
                 if exclusion:
