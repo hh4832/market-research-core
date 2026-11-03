@@ -24,26 +24,35 @@ Cost profiles are immutable dataclasses with canonical SHA-256. Every profile in
 
 Map Phase 3 bar fields directly: timestamp to \`bar_start\` only when source semantics confirm START; retain explicit \`bar_end\`, \`available_at\`, timezone and session; map its side eligibility fields one-to-one. Map request orders to \`ExecutionOrder\`. Return engine rows as fills, round_trips, rejections, equity_curve, open_position, invalidated_round_trips, and provenance. The adapter must not calculate fills or PnL. Pass `spec_sha256`, parameters, cost multiplier, seed and request windows through `ExecutionConfig`; the engine emits the Phase 3 convention identifier `oracle-execution-convention-v1`.
 
+## Phase 2.1 acceptance remediation
+
+The M1.1 cross-check against Core `a50f3902c3a014922601d8cca4e7bdf761d377b8` reported G12, G14, G15 and G16. Core fixes are implemented on the existing Phase 2.1 PR branch; the independent Oracle rerun on the final Core SHA is still pending.
+
+- **G16 chronological execution:** one event loop advances in `bar_start` order. At each bar, eligible live orders are evaluated by `order_time` and order ID. Cash, margin, FIFO lots and filled target state change at the fill event.
+- **G12 cost arithmetic:** `calculate_costs` uses Decimal inputs and returns Decimal fee/tax values. Rounding supports `HALF_UP`, `UP`, `DOWN` (currency cents), `NONE` (unrounded), and `FLOOR_INTEGER` (floor to whole currency units). Account PnL is not rounded again to cents.
+- **G14 DAY TIF:** DAY expires at the first `session_close > order_time`. It remains live across bars and sessions through that boundary; boundary/out-of-session bars cannot fill. NEXT_BAR retains its one-candidate behavior.
+- **G15 rejection audit:** every extant candidate bar skipped for session, data, volume, side eligibility, exclusion, or limit reasons is recorded with `order_id`, `bar_ts`, and a specific `reason`, including when a later bar fills the order.
+
 ## Benchmark status
 
-The independent Phase 3 Oracle remains authoritative; no oracle answers were edited. Every case below is **NOT_IMPLEMENTED as an Oracle comparison** (the engine feature coverage is noted separately). Do not claim Benchmark PASS until the Phase 3 harness runs against this API.
+The independent Phase 3 Oracle remains authoritative; no Oracle answers or fixtures were edited. The M1.1 baseline executed all cases on Core `a50f3902`: **B02 PASS; 11 FAIL**. The four reported Core gaps have been corrected on this branch. The Oracle rerun against the final Core SHA is pending; this contract does not claim Benchmark PASS.
 
-| Case | Oracle comparison | Core feature coverage |
+| Case | M1.1 result on a50f3902 | Reported gap |
 | --- | --- | --- |
-| B01 ordinary execution | NOT_IMPLEMENTED | MARKET fill path |
-| B02 next-bar signal | NOT_IMPLEMENTED | Explicit availability/order timing |
-| B03 missing bar | NOT_IMPLEMENTED | NEXT_BAR rejects if first extant bar is ineligible; exact Oracle rule needs comparison |
-| B04 zero volume | NOT_IMPLEMENTED | Rejects zero-volume bar |
-| B05 outside session | NOT_IMPLEMENTED | Session-open/close gate |
-| B06 costs/slippage and short | NOT_IMPLEMENTED | Cost profile and short FIFO path |
-| B07 side-specific limit lock | NOT_IMPLEMENTED | Independent buy/sell eligibility |
-| B08 PIT availability | NOT_IMPLEMENTED | Rejects order_time before signal_available_at |
-| B09 futures roll | NOT_IMPLEMENTED | FIFO lots keyed by actual contract |
-| B10 open position | NOT_IMPLEMENTED | End-of-data position remains open |
-| B11 exclusion window | NOT_IMPLEMENTED | Cross-window trade invalidation |
-| B12 ORB lookahead | NOT_IMPLEMENTED | Engine accepts orders only; signal-generation lookahead stays with Phase 3 |
+| B01 ordinary execution | FAIL | G12 |
+| B02 next-bar signal | PASS | — |
+| B03 missing bar | FAIL | G12 |
+| B04 zero volume | FAIL | G12, G15 |
+| B05 outside session | FAIL | G14, G15 |
+| B06 costs/slippage and short | FAIL | G12 |
+| B07 side-specific limit lock | FAIL | G12, G15 |
+| B08 PIT availability | FAIL | G12 |
+| B09 futures roll | FAIL | G12 |
+| B10 open position | FAIL | G12 |
+| B11 exclusion window | FAIL | G12 |
+| B12 ORB lookahead | FAIL | G12 |
 
-Unknown TXF label and IBKR TSM session coverage remain market-specific blocks.
+Unknown TXF label and IBKR TSM session coverage remain market-specific blocks. Synthetic Oracle acceptance does not authorize formal market backtests.
 
 ## Limitations
 
