@@ -65,3 +65,23 @@ Target-order activation, rebalance, fill, expiry, and rejection are exposed in `
 
 Execution is full-quantity only. Partial fills are unsupported; an order either fills its full requested/derived quantity at one eligible bar or remains pending/rejects according to TIF and execution gates. The engine does not represent partially filled open orders.
 
+
+
+## M3-A IBKR TSM market gate
+
+The pinned TSM snapshot may be loaded for bounded research diagnostics, but its
+`GO` data-quality verdict is not execution approval. The producer request uses
+`useRTH=False` and therefore combines RTH with available extended-hours data.
+The one-minute timestamp label, per-bar session, and `available_at` remain
+`UNKNOWN`. The unified adapter keeps `bar_start`, `bar_end`, and
+`available_at` unavailable, sets both side eligibility flags false, and rejects
+with `TIMESTAMP_LABEL_OR_SESSION_UNKNOWN`. Provenance is `RESEARCH_ONLY` while
+execution eligibility is false.
+
+The Agent's IBKR equity profile remains DRAFT and ASSUMED. Core's percentage and
+tick-based cost fields cannot faithfully represent its per-share commission and
+basis-point slippage, and spread/volume participation are unresolved. Do not run
+a TSM ExecutionEngine probe or present formal performance until the timestamp,
+availability, session mask, cost mapping, and approvals are evidenced. See
+[the M3-A readiness report](docs/M3A_IBKR_TSM_READINESS.md) and
+[machine-readable diagnostic](docs/diagnostics/m3a_ibkr_tsm_readiness.json).
