@@ -171,3 +171,138 @@ def test_day_tif_records_each_rejected_candidate_bar_before_later_fill():
    pd.Timestamp("2024-01-02 09:00",tz="Asia/Taipei"),
    pd.Timestamp("2024-01-02 09:01",tz="Asia/Taipei")]
  assert list(r.rejections.reason)==["ZERO_VOLUME_BAR","LIMIT_UP_LOCKED_BUY"]
+
+
+def target_order(tm, side, target, *, order_id, signal_tm=None):
+    signal_tm = signal_tm or tm
+    return ExecutionOrder(
+        symbol="2330", market="TW_EQUITY", contract="CASH",
+        signal_time=pd.Timestamp(f"2024-01-02 {signal_tm}", tz="Asia/Taipei"),
+        signal_available_at=pd.Timestamp(f"2024-01-02 {tm}", tz="Asia/Taipei"),
+        order_time=pd.Timestamp(f"2024-01-02 {tm}", tz="Asia/Taipei"),
+        side=side, strategy_id="s", experiment_id="e",
+        target_position=target, time_in_force="DAY", order_id=order_id,
+    )
+
+
+def contract_bars(specs, *, session_close="09:40"):
+    rows = []
+    for tm, buy_ok, sell_ok, price in specs:
+        start = pd.Timestamp(f"2024-01-02 {tm}", tz="Asia/Taipei")
+        rows.append(dict(
+            bar_start=start, bar_end=start + pd.Timedelta(minutes=5),
+            available_at=start + pd.Timedelta(minutes=5), timezone="Asia/Taipei",
+            session="RTH", symbol="2330", market="TW_EQUITY", contract="CASH",
+            open=price, high=price + 1, low=price - 1, close=price, volume=10000,
+            data_exists=True, backtest_eligible=True,
+            buy_execution_eligible=buy_ok, sell_execution_eligible=sell_ok,
+            execution_rejection_reason="LIMIT_UP_LOCKED_BUY" if not buy_ok else "",
+            buy_execution_rejection_reason="LIMIT_UP_LOCKED_BUY" if not buy_ok else "",
+            sell_execution_rejection_reason="LIMIT_DOWN_LOCKED_SELL" if not sell_ok else "",
+            session_open=pd.Timestamp("2024-01-02 09:00", tz="Asia/Taipei"),
+            session_close=pd.Timestamp(f"2024-01-02 {session_close}", tz="Asia/Taipei"),
+        ))
+    return pd.DataFrame(rows)
+
+
+def test_g17_delayed_target_buy_is_balanced_by_later_flat_target():
+    f = contract_bars([
+        ("09:10", False, True, 60), ("09:15", False, True, 60),
+        ("09:20", False, True, 60), ("09:25", True, True, 60),
+    ])
+    older = target_order("09:10", "BUY", 1000, order_id="old-buy", signal_tm="09:05")
+    flatten = target_order("09:20", "SELL", 0, order_id="flat", signal_tm="09:15")
+    r = ExecutionEngine().run(f, [older, flatten], cost_profile=profile(),
+        config=config(permitted_usage_scope="RESEARCH_ONLY"))
+    assert list(zip(r.fills.side, r.fills.qty, r.fills.exec_ts.dt.strftime("%H:%M"))) == [
+        ("SELL", 1000, "09:20"), ("BUY", 1000, "09:25")]
+    assert r.open_positions.empty
+    assert r.round_trips.iloc[0].side == "SHORT"
+    assert r.order_events.loc[
+        r.order_events.order_id.eq("flat"), "reason_code"
+    ].tolist()[0] == "PENDING_TARGET_INCLUDED"
+    rebalance = r.order_events[
+        (r.order_events.order_id == "old-buy")
+        & (r.order_events.event == "TARGET_ORDER_REBALANCED")
+    ].iloc[0]
+    assert rebalance.related_order_id == "flat"
+    assert rebalance.reason_code == "NEWER_TARGET_RECONCILES_LIVE_INTENT"
+    assert list(r.rejections.loc[
+        r.rejections.order_id.eq("old-buy"), "bar_ts"
+    ].dt.strftime("%H:%M")) == ["09:10", "09:15", "09:20"]
+
+
+def test_g17_later_target_nets_against_pending_target_quantity():
+    f = contract_bars([
+        ("09:10", False, True, 60), ("09:15", False, True, 60),
+        ("09:20", True, True, 60),
+    ])
+    older = target_order("09:10", "BUY", 1000, order_id="old-buy", signal_tm="09:05")
+    replace_with_500 = target_order("09:15", "SELL", 500, order_id="new-target", signal_tm="09:10")
+    r = ExecutionEngine().run(f, [older, replace_with_500], cost_profile=profile(),
+        config=config(permitted_usage_scope="RESEARCH_ONLY"))
+    assert list(zip(r.fills.side, r.fills.qty)) == [("SELL", 500), ("BUY", 1000)]
+    assert r.open_positions.iloc[0].side == "LONG"
+    assert r.open_positions.iloc[0].qty == 500
+
+
+def test_g17_same_timestamp_target_orders_have_deterministic_ordering():
+    f = contract_bars([("09:10", True, True, 60)])
+    first = target_order("09:10", "BUY", 1000, order_id="a-target", signal_tm="09:05")
+    second = target_order("09:10", "SELL", 500, order_id="b-target", signal_tm="09:05")
+    def run(input_orders):
+        return ExecutionEngine().run(f, input_orders, cost_profile=profile(),
+            config=config(permitted_usage_scope="RESEARCH_ONLY"))
+    a, b = run([first, second]), run([second, first])
+    assert list(zip(a.fills.order_id, a.fills.side, a.fills.qty)) == list(
+        zip(b.fills.order_id, b.fills.side, b.fills.qty))
+    assert list(zip(a.fills.side, a.fills.qty)) == [("BUY", 1000), ("SELL", 500)]
+
+
+def test_g17_explicit_quantity_orders_remain_independent_of_target_orders():
+    f = contract_bars([("09:10", True, True, 60), ("09:15", True, True, 60)])
+    explicit = order("2024-01-02 09:10", "BUY", 100)
+    target = target_order("09:15", "BUY", 500, order_id="target", signal_tm="09:10")
+    r = ExecutionEngine().run(f, [explicit, target], cost_profile=profile(),
+        config=config(permitted_usage_scope="RESEARCH_ONLY"))
+    assert list(r.fills.qty) == [100, 400]
+    assert list(r.order_events.loc[
+        (r.order_events.order_id.eq("order-1"))
+        & (r.order_events.event.eq("ORDER_ACTIVATED")), "reason_code"
+    ]) == ["EXPLICIT_QUANTITY_INDEPENDENT"]
+
+
+def test_g14b_order_expires_before_bar_start_equal_to_expiry():
+    f = contract_bars([
+        ("09:10", False, True, 60), ("09:15", False, True, 60),
+        ("09:20", True, True, 60),
+    ], session_close="09:20")
+    # The final row is the next session opening exactly at the prior close/expiry.
+    f.loc[2, "session"] = "RTH_NEXT"
+    f.loc[2, "session_open"] = pd.Timestamp("2024-01-02 09:20", tz="Asia/Taipei")
+    f.loc[2, "session_close"] = pd.Timestamp("2024-01-02 09:40", tz="Asia/Taipei")
+    o = target_order("09:10", "BUY", 1000, order_id="day-boundary", signal_tm="09:05")
+    r = ExecutionEngine().run(f, [o], cost_profile=profile(),
+        config=config(permitted_usage_scope="RESEARCH_ONLY"))
+    assert r.fills.empty
+    expired = r.rejections[r.rejections.reason.eq("ORDER_EXPIRED")].iloc[0]
+    assert pd.isna(expired.bar_ts)
+    assert expired.expiry_ts == pd.Timestamp("2024-01-02 09:20", tz="Asia/Taipei")
+    assert list(r.rejections.loc[
+        r.rejections.reason.eq("LIMIT_UP_LOCKED_BUY"), "bar_ts"
+    ].dt.strftime("%H:%M")) == ["09:10", "09:15"]
+
+
+def test_g14b_day_order_can_fill_strictly_before_expiry():
+    f = contract_bars([
+        ("09:10", False, True, 60), ("09:15", True, True, 60),
+        ("09:20", True, True, 60),
+    ], session_close="09:20")
+    f.loc[2, "session"] = "RTH_NEXT"
+    f.loc[2, "session_open"] = pd.Timestamp("2024-01-02 09:20", tz="Asia/Taipei")
+    f.loc[2, "session_close"] = pd.Timestamp("2024-01-02 09:40", tz="Asia/Taipei")
+    o = target_order("09:10", "BUY", 1000, order_id="day-before-boundary", signal_tm="09:05")
+    r = ExecutionEngine().run(f, [o], cost_profile=profile(),
+        config=config(permitted_usage_scope="RESEARCH_ONLY"))
+    assert r.fills.iloc[0].exec_ts == pd.Timestamp("2024-01-02 09:15", tz="Asia/Taipei")
+    assert not r.rejections.reason.eq("ORDER_EXPIRED").any()
