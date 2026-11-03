@@ -1,4 +1,5 @@
 from dataclasses import replace
+from decimal import Decimal
 
 import pandas as pd
 import pytest
@@ -106,3 +107,28 @@ def test_fills_and_position_ledger_follow_execution_time_not_order_creation_time
  assert fill_times==sorted(fill_times)
  assert all(pd.Timestamp(trip.entry_ts)<=pd.Timestamp(trip.exit_ts) for trip in r.round_trips.itertuples())
  assert r.round_trips.iloc[0].side=="SHORT"
+
+def test_cost_rounding_none_preserves_decimal_precision():
+ p=replace(profile(),equity_commission_rate=.001425,minimum_commission=0,
+   fee_rounding="NONE",tax_rounding="NONE")
+ fee,tax=calculate_costs(61.1,1000,"SELL",p)
+ assert fee==Decimal("87.0675")
+ assert tax==Decimal("183.3")
+
+def test_cost_rounding_floor_integer_is_explicit():
+ p=replace(profile(),equity_commission_rate=.001425,minimum_commission=0,
+   fee_rounding="FLOOR_INTEGER",tax_rounding="FLOOR_INTEGER")
+ fee,tax=calculate_costs(61.1,1000,"SELL",p)
+ assert fee==Decimal("87")
+ assert tax==Decimal("183")
+
+def test_unrounded_cost_precision_flows_into_realized_pnl():
+ f=bars()
+ p=replace(profile(),equity_commission_rate=.001425,minimum_commission=0,
+   fee_rounding="NONE",tax_rounding="NONE")
+ r=ExecutionEngine().run(f,[order("2024-01-02 09:00","BUY"),
+   order("2024-01-02 09:02","SELL")],cost_profile=p,
+   config=config(permitted_usage_scope="RESEARCH_ONLY"))
+ assert abs(float(r.fills.iloc[0].fee)-0.1425)<1e-12
+ assert abs(float(r.fills.iloc[1].tax)-0.306)<1e-12
+ assert abs(float(r.round_trips.iloc[0].net_pnl)-1.40615)<1e-10
