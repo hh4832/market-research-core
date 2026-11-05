@@ -1,0 +1,92 @@
+{
+  "schema_version": "1.0.0",
+  "configuration_sha256": "b21ebae3f086184be7c94d34da18a03e5ec9a4d376f8e268b81745cf725da125",
+  "profile": {
+    "profile_id": "ibkr_fixed_equity",
+    "version": "1.0.0",
+    "instrument_type": "EQUITY",
+    "approval_status": "DRAFT",
+    "source_evidence": "https://www.interactivebrokers.com/en/pricing/commissions-stocks.php; NOT independently verified",
+    "basis": "ASSUMED",
+    "equity_commission_rate": 0,
+    "minimum_commission": 1,
+    "sell_tax_rate": 0,
+    "futures_fee_per_contract_per_side": 0,
+    "futures_transaction_tax_rate": 0,
+    "contract_multiplier": 1,
+    "tick_size": 0.01,
+    "slippage_ticks": 0,
+    "fee_rounding": "HALF_UP",
+    "tax_rounding": "HALF_UP",
+    "component_basis": {
+      "contract_multiplier": "ASSUMED",
+      "equity_commission_rate": "ASSUMED",
+      "fee_rounding": "ASSUMED",
+      "futures_fee_per_contract_per_side": "ASSUMED",
+      "futures_transaction_tax_rate": "ASSUMED",
+      "minimum_commission": "ASSUMED",
+      "sell_tax_rate": "ASSUMED",
+      "slippage_ticks": "ASSUMED",
+      "tax_rounding": "ASSUMED",
+      "tick_size": "ASSUMED",
+      "equity_slippage_bps": "ASSUMED",
+      "volume_participation_cap": "ASSUMED",
+      "commission_cap_rate": "ASSUMED",
+      "equity_commission_per_share": "ASSUMED",
+      "half_spread_bps": "ASSUMED"
+    },
+    "component_evidence": {
+      "equity_slippage_bps": "https://www.interactivebrokers.com/en/pricing/commissions-stocks.php; NOT independently verified",
+      "volume_participation_cap": "https://www.interactivebrokers.com/en/pricing/commissions-stocks.php; NOT independently verified",
+      "commission_cap_rate": "https://www.interactivebrokers.com/en/pricing/commissions-stocks.php; NOT independently verified",
+      "equity_commission_per_share": "https://www.interactivebrokers.com/en/pricing/commissions-stocks.php; NOT independently verified",
+      "half_spread_bps": "https://www.interactivebrokers.com/en/pricing/commissions-stocks.php; NOT independently verified"
+    },
+    "component_approval_status": {
+      "equity_slippage_bps": "PENDING",
+      "volume_participation_cap": "PENDING",
+      "commission_cap_rate": "PENDING",
+      "equity_commission_per_share": "PENDING",
+      "half_spread_bps": "PENDING"
+    },
+    "commission_scheme": "FIXED",
+    "fee_mode": "COMPONENTIZED",
+    "equity_commission_per_share": 0.005,
+    "commission_cap_rate": 0.01,
+    "equity_slippage_bps": 2,
+    "half_spread_bps": 0,
+    "volume_participation_cap": 0.01
+  },
+  "applicability": {
+    "symbols": [
+      "TSM",
+      "SOXX"
+    ],
+    "market": "IBKR_EQUITY",
+    "currency": "USD",
+    "effective_from": "2025-01-01",
+    "effective_to": null,
+    "assumption_status": "ASSUMED",
+    "evidence_ref": "https://www.interactivebrokers.com/en/pricing/commissions-stocks.php",
+    "verification_status": "UNVERIFIED",
+    "stress_slippage": [
+      0,
+      2,
+      4
+    ],
+    "listed_commission_rate": null,
+    "qualified_daytrade_tax_rate": null,
+    "daytrade_conditions": []
+  },
+  "regulatory_schedule": [
+    {
+      "version": "PENDING-ACCOUNT-RATE-v1",
+      "effective_from": "2025-01-01",
+      "effective_to": null,
+      "rate": null,
+      "basis": "UNKNOWN",
+      "evidence_ref": "https://www.interactivebrokers.com/en/pricing/commissions-stocks.php",
+      "approval_status": "PENDING"
+    }
+  ]
+}

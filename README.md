@@ -76,3 +76,7 @@ Offline tests verify contracts but are not real-Drive evidence. Run the read-onl
 [`notebooks/colab_phase2_drive_smoke_test.ipynb`](notebooks/colab_phase2_drive_smoke_test.ipynb)
 for formal three-adapter evidence. It consumes existing FINAL GATE artifacts and
 does not rerun historical validation.
+
+M3-A.4 engineering API, bounded synthetic evidence, cost JSON/YAML examples and
+Agent field definitions: [Temporal & Cost Contract](docs/M3A4_TEMPORAL_COST_CONTRACT.md).
+The label-agnostic research mode never upgrades real TSM to formal eligibility.

@@ -1,0 +1,185 @@
+{
+  "schema_version": "1.2.0",
+  "gate_id": "M3-A.1-IBKR-TSM",
+  "decision": {
+    "scope": "SCOPED_GO",
+    "allowed": "BOUNDED_READ_ONLY_RESEARCH_DIAGNOSTICS",
+    "formal_execution": "NO_GO",
+    "real_data_execution_probe": "NOT_RUN"
+  },
+  "core": {
+    "base_sha": "bf01fa92bc95f9fc8b04038875c813f6cd30ad99",
+    "feature_branch": "feature/m3a-ibkr-tsm-readiness",
+    "pr": "https://github.com/hh4832/market-research-core/pull/3"
+  },
+  "dataset": {
+    "snapshot_id": "20261101_205431_06359faf7ef4_IBKR_FINAL_GATE_FULL",
+    "producer_sha": "06359faf7ef4b8ff702a7ab1a6d07521d3b68f28",
+    "instrument": "TSM",
+    "preexisting_quality_verdict": "GO",
+    "preexisting_rows": 2193372,
+    "history_gate_rerun": false,
+    "full_download": false,
+    "source_request": {
+      "bar_size": "1 min",
+      "what_to_show": "TRADES",
+      "use_rth": false,
+      "format_date": 2,
+      "keep_up_to_date": false
+    },
+    "coverage": "RTH_AND_AVAILABLE_EXTENDED_HOURS; NOT_24_HOUR"
+  },
+  "timestamp_availability": {
+    "source_timezone": "UTC_EPOCH_CONVERSION",
+    "timestamp_label": "UNKNOWN",
+    "applies_to": "PINNED_TSM_ONE_MINUTE_TRADES_PATH_ONLY",
+    "bar_start": "UNKNOWN_NOT_DERIVED",
+    "bar_end": "UNKNOWN_NOT_DERIVED",
+    "observed_available_at": "UNKNOWN_NOT_RECORDED",
+    "conservative_policy": {
+      "name": "BAR_END_STRICT_LATER",
+      "meaning": "Model information available at completed bar_end; execution requires a later eligible bar_start",
+      "is_observed_ibkr_latency": false,
+      "same_timestamp_open_allowed": false,
+      "approval": "PENDING_RESEARCH_OWNER"
+    },
+    "minimum_missing_evidence": [
+      "Exact downloader revision and acquisition receipt for pinned snapshot",
+      "Bounded bar-to-underlying-trade interval correlation or authoritative IBKR timestamp semantics",
+      "Owner decision on use of conservative availability policy"
+    ]
+  },
+  "session_mask": {
+    "calendar": "NYSE",
+    "package": "pandas-market-calendars",
+    "version": "5.5.0",
+    "timezone": "America/New_York",
+    "labels": [
+      "RTH",
+      "PRE_MARKET",
+      "AFTER_HOURS",
+      "OUTSIDE_SESSION"
+    ],
+    "handles_dst_holidays_early_closes": true,
+    "boundary_crossing_bar": "OUTSIDE_SESSION",
+    "missing_bars_filled": false,
+    "default_enabled_session_after_gate": "RTH_ONLY",
+    "eth_enabled": false,
+    "real_snapshot_mask_applied": false,
+    "reason": "TIMESTAMP_LABEL_UNKNOWN"
+  },
+  "eligibility": {
+    "buy_execution_eligible": false,
+    "sell_execution_eligible": false,
+    "rejection_reason": "TIMESTAMP_LABEL_OR_SESSION_UNKNOWN",
+    "same_bar_execution": false,
+    "real_data_execution_engine_allowed": false
+  },
+  "cost_model": {
+    "core_represents": [
+      "PER_SHARE_COMMISSION",
+      "MINIMUM_COMMISSION",
+      "BPS_SLIPPAGE",
+      "HALF_SPREAD_BPS",
+      "SELL_SIDE_REGULATORY_FEE",
+      "VOLUME_PARTICIPATION_CAP"
+    ],
+    "volume_cap_behavior": "REJECT_FULL_ORDER_IF_CAP_EXCEEDED; PARTIAL_FILLS_UNSUPPORTED",
+    "component_basis_evidence_approval_in_provenance": true,
+    "ibkr_profile_approval": "DRAFT_ASSUMED_APPROVAL_PENDING",
+    "official_or_broker_actual_rates_supplied": false,
+    "formal_cost_approval": false
+  },
+  "validation": {
+    "scope": "TARGETED_SYNTHETIC_REGRESSION_ONLY",
+    "tests": [
+      "unknown timestamp and availability fail closed",
+      "NYSE session labels: RTH, pre-market, after-hours, outside-session",
+      "DST, holiday, early close, and boundary-crossing bars",
+      "START/END mapping equivalence synthetic only",
+      "BAR_END_STRICT_LATER execution timing",
+      "per-share minimum, bps slippage, half spread, sell regulatory fee",
+      "cost ledger flow and provenance",
+      "volume participation cap rejection"
+    ],
+    "oracle_b01_b12_g16_g17_g14b_modified": false,
+    "oracle_rerun": false
+  },
+  "archive": {
+    "created": false,
+    "reason": "NO_REAL_DATA_EXECUTION_OUTPUT"
+  },
+  "blockers": [
+    {
+      "owner": "DATA_PRODUCER_OWNER",
+      "item": "Pinned timestamp label evidence and request receipt"
+    },
+    {
+      "owner": "DATA_OWNER_AND_RESEARCH_OWNER",
+      "item": "Availability policy decision and real row-level session mapping"
+    },
+    {
+      "owner": "ACCOUNT_OWNER_AND_RESEARCH_LEAD",
+      "item": "Cost evidence/approval and side-specific execution policy"
+    }
+  ],
+  "m3_a2": {
+    "scope": "BOUNDED_READ_ONLY_FIXED_SNAPSHOT",
+    "snapshot_id": "20261101_205431_06359faf7ef4_IBKR_FINAL_GATE_FULL",
+    "producer_sha": "06359faf7ef4b8ff702a7ab1a6d07521d3b68f28",
+    "drive_file_id": "1B_2WyFRHXUzwg3C1BR7GLApGl722Ezli",
+    "parquet_size_bytes": 29363599,
+    "selected_dates": [
+      "2016-10-20",
+      "2016-10-21",
+      "2016-10-25",
+      "2016-10-28",
+      "2016-11-04",
+      "2016-11-07",
+      "2016-11-08"
+    ],
+    "extraction_script": "src/market_research_core/ibkr_tsm_audit.py",
+    "extraction_script_status": "COMMITTED_NOT_EXECUTED_AGAINST_PARQUET",
+    "extraction_reason": "Current Drive connector exposes metadata and text diagnostics but no bounded Parquet column/row reads; downloading the full binary would exceed the requested access boundary.",
+    "output_csvs": {
+      "bounded_timestamp_evidence": "NOT_GENERATED_NO_RAW_ROWS_READ",
+      "closing_auction_comparison": "NOT_GENERATED_NO_RAW_ROWS_READ"
+    },
+    "timestamp": {
+      "first_rth_0930": "NOT_REVERIFIED",
+      "last_rth_1559": "NOT_REVERIFIED",
+      "390_bars": "NOT_REVERIFIED_FROM_RAW_ROWS",
+      "label_verdict": "UNKNOWN",
+      "producer_coverage_assumption": "daily_coverage assumes bar_start; output status COVERAGE_OK_LABEL_UNVERIFIED is not independent evidence"
+    },
+    "auction": {
+      "rows_1558_to_1602": "NOT_READ",
+      "attribution": "UNKNOWN_NO_TRADE_CONDITION_OR_TICK_DATA",
+      "official_close_comparison": "NOT_AVAILABLE",
+      "rth_close_boundary": "FAIL_CLOSED"
+    },
+    "final_gate_rerun": false,
+    "full_snapshot_download": false,
+    "raw_mutated": false,
+    "required_next_evidence": "Run the committed bounded PyArrow audit against the mounted existing Drive file and preserve its CSV/JSON output; auction attribution additionally needs trade-time/sale-condition evidence or authoritative provider mapping plus independent official close.",
+    "official_api_scope": {
+      "tws_req_historical_data": {
+        "timestamp_label": "NOT_SPECIFIED_IN_REVIEWED_OFFICIAL_DOCS",
+        "sources": [
+          "https://interactivebrokers.github.io/tws-api/historical_bars.html",
+          "https://interactivebrokers.github.io/tws-api/classIBApi_1_1Bar.html"
+        ],
+        "summary": "TWS API docs describe reqHistoricalData, Bar.Time representation/time zone, and covered candlestick values, but do not define a 1-minute Bar.Time as interval start or end."
+      },
+      "protobuf_historical_data_bar": {
+        "timestamp_label": "START_OF_COVERED_DATA",
+        "source": "https://ibkrcampus.eu/docs/tws-api/protobuf/historical-data-bar",
+        "applies_to_pinned_snapshot": false,
+        "reason": "Reviewed downloader route uses legacy TWS reqHistoricalData/EWrapper.Bar; no acquisition receipt pins protobuf route/schema."
+      },
+      "overall_snapshot_verdict": "UNKNOWN"
+    }
+  },
+  "m3a4_final_ref": "docs/diagnostics/m3a4_final.json",
+  "m3a4_note": "Opt-in conservative research model added; source label and auction UNKNOWN; formal_execution remains NO_GO. Engineering acceptance is separate."
+}

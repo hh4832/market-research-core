@@ -111,3 +111,23 @@ def test_duplicate_timestamps_fail_closed(tmp_path: Path):
     with pytest.raises(PolicyViolation, match="duplicate"):
         MarketDataClient.from_run_dir(root).load("TSM")
 
+
+
+def test_tsm_unknown_execution_semantics_are_research_only(tmp_path: Path):
+    root = make_run(tmp_path)
+    pd.DataFrame(
+        {"timestamp_utc": ["2020-01-02T14:30:00Z"], "close": [10.0]}
+    ).to_parquet(root / "tsm_normalized.parquet", index=False)
+
+    bars = MarketDataClient.from_run_dir(root).load(market="IBKR", symbol="TSM")
+    row = bars.frame.iloc[0]
+
+    assert row["timestamp_label"] == "UNKNOWN"
+    assert row["session"] == "UNKNOWN"
+    assert pd.isna(row["bar_start"])
+    assert pd.isna(row["bar_end"])
+    assert pd.isna(row["available_at"])
+    assert not row["buy_execution_eligible"]
+    assert not row["sell_execution_eligible"]
+    assert row["execution_rejection_reason"] == "TIMESTAMP_LABEL_OR_SESSION_UNKNOWN"
+    assert bars.provenance.permitted_usage_scope == "RESEARCH_ONLY"

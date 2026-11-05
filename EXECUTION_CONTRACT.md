@@ -65,3 +65,52 @@ Target-order activation, rebalance, fill, expiry, and rejection are exposed in `
 
 Execution is full-quantity only. Partial fills are unsupported; an order either fills its full requested/derived quantity at one eligible bar or remains pending/rejects according to TIF and execution gates. The engine does not represent partially filled open orders.
 
+
+
+## M3-A IBKR TSM market gate
+
+The pinned TSM snapshot may be loaded for bounded research diagnostics, but its
+`GO` data-quality verdict is not execution approval. The producer request uses
+`useRTH=False` and therefore combines RTH with available extended-hours data.
+The one-minute timestamp label, per-bar session, and `available_at` remain
+`UNKNOWN`. The unified adapter keeps `bar_start`, `bar_end`, and
+`available_at` unavailable, sets both side eligibility flags false, and rejects
+with `TIMESTAMP_LABEL_OR_SESSION_UNKNOWN`. Provenance is `RESEARCH_ONLY` while
+execution eligibility is false.
+
+The Agent's IBKR equity profile remains DRAFT and ASSUMED. Core's percentage and
+tick-based cost fields cannot faithfully represent its per-share commission and
+basis-point slippage, and spread/volume participation are unresolved. Do not run
+a TSM ExecutionEngine probe or present formal performance until the timestamp,
+availability, session mask, cost mapping, and approvals are evidenced. See
+[the M3-A readiness report](docs/M3A_IBKR_TSM_READINESS.md) and
+[machine-readable diagnostic](docs/diagnostics/m3a_ibkr_tsm_readiness.json).
+
+
+## M3-A.1 IBKR TSM execution gate
+
+### Timestamp and availability
+
+For the pinned TSM snapshot, the source timestamp is **UNKNOWN** as either a minute-bar start or end label. The pinned cleaning producer SHA is `06359faf7ef4b8ff702a7ab1a6d07521d3b68f28`; it does not pin the downloader revision or a request receipt that defines the label. The downloader code available for inspection converts IBKR's `date` field to UTC epoch timestamps, but that conversion does not establish interval semantics. IBKR's documented `formatDate=2` and `useRTH=0` parameters describe timestamp representation and RTH filtering only. Until a receipt plus bounded trade-interval correlation or an explicit provider statement resolves the label, Core must leave `bar_start` and `bar_end` unknown and reject TSM execution.
+
+Actual historical publication latency is a separate fact and is **UNKNOWN** for this snapshot. `BAR_END_STRICT_LATER` is a conservative simulation policy: it models information as available at the completed bar's end, forbids same-timestamp bar-open execution, and requires execution on a later eligible bar. It is not an observation or estimate of IBKR publication delay. `OBSERVED` is permitted only when actual availability evidence is supplied. The TSM data client currently selects `UNKNOWN` for both timestamp label and availability and therefore remains research-only.
+
+### Session classification
+
+`apply_tsm_session_mask` uses the pinned `pandas-market-calendars==5.5.0` NYSE schedule and America/New_York timezone conversion. It distinguishes `RTH`, `PRE_MARKET`, `AFTER_HOURS`, and `OUTSIDE_SESSION`, including DST, holidays, and scheduled early closes. A bar crossing a session boundary is `OUTSIDE_SESSION`. Session labels do not grant execution eligibility. Until the timestamp label is confirmed, the TSM client keeps every row's session unknown and both buy/sell eligibility false. When enabled after evidence review, the default research execution scope is RTH only; ETH remains ineligible unless separately approved. Missing bars are never synthesized.
+
+### Cost model mapping
+
+The backward-compatible CostProfile now represents per-share commission with a per-order minimum, equity slippage and half-spread in basis points, sell-side regulatory fee rate, and a volume participation cap. Component-level basis, evidence, and approval status are required for each populated optional component and flow into run provenance alongside the profile SHA. The volume cap rejects an order that exceeds the candidate bar's permitted volume; partial fills are unsupported. No IBKR rate is supplied or approved by this change. Empty or assumed values remain non-formal and do not satisfy the formal execution gate.
+
+### TSM gate outcome
+
+For the fixed snapshot `20261101_205431_06359faf7ef4_IBKR_FINAL_GATE_FULL`, use only bounded read-only diagnostics on the original timestamp. Do not derive bar boundaries, availability, session, or fills. Synthetic session and cost regressions do not constitute a real-data ExecutionEngine probe. Formal TSM execution remains blocked pending timestamp/receipt evidence, owner acceptance of an as-of policy, and approved cost and eligibility inputs.
+
+## M3-A.4 conservative research and configurable costs
+
+See [the exact released API and field contract](docs/M3A4_TEMPORAL_COST_CONTRACT.md).
+`CONSERVATIVE_LABEL_AGNOSTIC` preserves UNKNOWN source labels and uses explicit
+START/END uncertainty envelopes. It is always RESEARCH_ONLY. The unchanged
+MarketDataClient TSM default remains fail-closed; source-label confirmation and
+formal market approval are separate from this opt-in research model.

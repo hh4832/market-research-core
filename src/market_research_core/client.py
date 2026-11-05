@@ -9,6 +9,7 @@ from .ibkr import apply_exclusions, normalized_path, read_bars
 from .models import LoadMetadata, LoadedBars, MarketDataConfig, UnifiedBars, UnifiedProvenance
 from .policy import ALLOWED_VERDICTS, INSTRUMENTS
 from .snapshot import verify_snapshot
+from .ibkr_tsm import apply_tsm_session_mask
 
 
 class MarketDataClient:
@@ -64,10 +65,24 @@ class MarketDataClient:
         if market_key == "IBKR":
             native = self._load_ibkr(symbol_key, start=start, end=end, contract=contract, continuous=continuous)
             frame = _standardize(native.frame, symbol_key, "IBKR", contract=contract, timezone="UTC")
+            assumptions = ()
+            if symbol_key == "TSM":
+                # Snapshot evidence does not confirm whether the source timestamp
+                # labels bar start or end; keep the production path fail-closed.
+                frame = apply_tsm_session_mask(
+                    frame, timestamp_label="UNKNOWN", availability_policy="UNKNOWN"
+                )
+                assumptions = (
+                    "TSM 1-minute timestamp label UNKNOWN",
+                    "Historical IBKR publication latency UNKNOWN",
+                    "NYSE session mask requires a confirmed timestamp label",
+                )
             provenance = UnifiedProvenance("IBKR", symbol_key, native.metadata.snapshot.run_name,
                 native.metadata.snapshot.producer_git_sha, native.metadata.verdict, (str(native.metadata.source_path),),
                 exclusion_rules=((f"mandatory:{INSTRUMENTS[symbol_key].exclusions_filename}",) if INSTRUMENTS[symbol_key].exclusions_filename else ()),
-                permitted_usage_scope="BACKTEST")
+                permitted_usage_scope=("BACKTEST" if not frame.empty and bool(frame["execution_eligible"].all())
+                                       else "RESEARCH_ONLY"),
+                assumptions=assumptions)
             return UnifiedBars(frame, provenance, native)
         if market_key == "TXF":
             if self.config.txf_run_dir is None:

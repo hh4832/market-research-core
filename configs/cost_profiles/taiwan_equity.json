@@ -1,0 +1,70 @@
+{
+  "schema_version": "1.0.0",
+  "configuration_sha256": "42678a61c24073b798ad7268bf17a37be284e1bc9b1ae4b58f1785731b465348",
+  "profile": {
+    "profile_id": "taiwan_equity",
+    "version": "1.0.0",
+    "instrument_type": "EQUITY",
+    "approval_status": "DRAFT",
+    "source_evidence": "user-request:M3-A.4-INITIAL-RESEARCH-ASSUMPTIONS; NOT independently verified",
+    "basis": "ASSUMED",
+    "equity_commission_rate": 0.0005,
+    "minimum_commission": 0,
+    "sell_tax_rate": 0.003,
+    "futures_fee_per_contract_per_side": 0,
+    "futures_transaction_tax_rate": 0,
+    "contract_multiplier": 1,
+    "tick_size": 0.01,
+    "slippage_ticks": 0,
+    "fee_rounding": "HALF_UP",
+    "tax_rounding": "HALF_UP",
+    "component_basis": {
+      "contract_multiplier": "ASSUMED",
+      "equity_commission_rate": "ASSUMED",
+      "fee_rounding": "ASSUMED",
+      "futures_fee_per_contract_per_side": "ASSUMED",
+      "futures_transaction_tax_rate": "ASSUMED",
+      "minimum_commission": "ASSUMED",
+      "sell_tax_rate": "ASSUMED",
+      "slippage_ticks": "ASSUMED",
+      "tax_rounding": "ASSUMED",
+      "tick_size": "ASSUMED",
+      "equity_slippage_bps": "ASSUMED"
+    },
+    "component_evidence": {
+      "equity_slippage_bps": "user-request:M3-A.4-INITIAL-RESEARCH-ASSUMPTIONS; NOT independently verified"
+    },
+    "component_approval_status": {
+      "equity_slippage_bps": "PENDING"
+    },
+    "commission_scheme": "FIXED",
+    "fee_mode": "COMPONENTIZED",
+    "equity_slippage_bps": 5
+  },
+  "applicability": {
+    "symbols": [
+      "2330"
+    ],
+    "market": "TW_EQUITY",
+    "currency": "TWD",
+    "effective_from": "2025-01-01",
+    "effective_to": null,
+    "assumption_status": "ASSUMED",
+    "evidence_ref": "user-request:M3-A.4-INITIAL-RESEARCH-ASSUMPTIONS",
+    "verification_status": "UNVERIFIED",
+    "stress_slippage": [
+      2,
+      5,
+      10
+    ],
+    "listed_commission_rate": 0.001425,
+    "qualified_daytrade_tax_rate": 0.0015,
+    "daytrade_conditions": [
+      "same-day eligible stock offset",
+      "eligible instrument",
+      "eligible account",
+      "dated supporting evidence"
+    ]
+  },
+  "regulatory_schedule": []
+}
