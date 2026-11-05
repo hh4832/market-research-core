@@ -1,0 +1,110 @@
+{
+  "schema_version": "1.0.0",
+  "milestone": "M3-A.4_FINAL",
+  "base_sha": "c1a3661d127c7139ee86d824d1a380edf3d2e114",
+  "agent_acceptance_sha": "6309a732470c79600ff37d551adeeb9f194bdc30",
+  "temporal_safety": {
+    "verdict": "GO_ENGINEERING_RESEARCH_MODEL_ONLY",
+    "policy": {
+      "policy_id": "CONSERVATIVE_LABEL_AGNOSTIC",
+      "version": "1.0.0",
+      "source_minutes": 1,
+      "signal_start_et": "10:00",
+      "signal_end_et": "15:30",
+      "calendar_version": "5.5.0",
+      "assumption": "UNKNOWN source label; END completes at t, START at t+1m; availability is the later bound, not measured publication latency; execution requires the earliest possible candidate open strictly later; RTH only, no closing auction, no ETH, no gap filling"
+    },
+    "policy_sha256": "7fa3cdcaf501651f749dbc72c31b362fcb9e10cc55920191cef87c1a050059c4",
+    "source_label": "UNKNOWN",
+    "actual_publication_latency": "UNKNOWN",
+    "fifteen_source_bar_envelope_minutes": 16
+  },
+  "cost_calculation": {
+    "verdict": "GO_FIXED_AND_EXPLICIT_COMPONENTS",
+    "tiered": "UNSUPPORTED_FAIL_CLOSED",
+    "example_approval": "DRAFT_ASSUMED_UNVERIFIED",
+    "ibkr_regulatory_schedule": "PENDING_NO_RATE_SUPPLIED_FAIL_CLOSED",
+    "ibkr_fixed_official_verification": "HTTP_403_NOT_VERIFIED"
+  },
+  "core_agent_api": {
+    "verdict": "RELEASED_CORE_API_DOCUMENTED",
+    "engine_version": "2.2.0",
+    "adapter_acceptance": "PENDING_MINIMAL_AGENT_INTEGRATION",
+    "contract": "docs/M3A4_TEMPORAL_COST_CONTRACT.md"
+  },
+  "formal_market": {
+    "verdict": "NO_GO",
+    "timestamp_label": "UNKNOWN",
+    "closing_auction_attribution": "UNKNOWN",
+    "dataset_quality": "GO_PREEXISTING_USER_REPORTED",
+    "research_owner_approval": "PENDING",
+    "holdout_cost_approval": "PENDING",
+    "mode_cannot_be_formal_eligible": true
+  },
+  "regression": {
+    "python3.11": {
+      "passed": 84,
+      "failed": 0,
+      "skipped": 0
+    },
+    "python3.12": {
+      "passed": 84,
+      "failed": 0,
+      "skipped": 0
+    },
+    "coverage_percent": 84,
+    "command": "python -m pytest -o addopts= -q --cov=market_research_core --cov-report=term-missing",
+    "github_ci": "PENDING_PUSH"
+  },
+  "integrity": {
+    "configs/cost_profiles/ibkr_es.json": "4a2bd1ecb6b0d39568080fedfd9483281c1de5da3d4f25637d0c4cd1fd391a5a",
+    "configs/cost_profiles/ibkr_fixed_equity.json": "16f4dd0289817a9603a7f8392c493f4f6a90492cdff396ffd35b49ed19f4ff0b",
+    "configs/cost_profiles/ibkr_nq.json": "9934839c8a91a17e23ee05266321a8d14b3f707b94370733effbb9e79e8c50b4",
+    "configs/cost_profiles/taiwan_equity.json": "2e20fc9cbdd305bd43a5cd5c034f5df7b45968682a4b83a2b6f0846c3a97f130",
+    "configs/cost_profiles/txf.json": "516142c2a81938b3554d20913f15a34d910e9e0d459ad2e8e9c5e6a2cb686389",
+    "configs/cost_profiles/txf.yaml": "6748c8a983c651e7fd09ede8b34e1ea0db8e619eb0dc74369784c9d68a916e77",
+    "src/market_research_core/__init__.py": "e866fbab9330318809bd1cd5ee65c5e5e662d5755ce6e50b06ebd1c1de37b53a",
+    "src/market_research_core/backtest.py": "a62ecb370a4b77a677b5ff2feddf5bf0d9e385c4b02a71af17423b2442502b93",
+    "src/market_research_core/cli.py": "02e8264d6c3c3abc78954c6bd6116eee4250dd5dee431be80c855585ce75b6d7",
+    "src/market_research_core/client.py": "6e566edf0eafb2c4bfa0dc6787bb00fae4bdc22a67c248d3c16c64224ed83795",
+    "src/market_research_core/cost_config.py": "c13fee79d737ab2b3913e63a1d2e403a747cf9b67fc8deaaf98aeacae9a3c006",
+    "src/market_research_core/costs.py": "d01e2d83812ed7eb1171fdda5212cac6100b520928dbc9cb9310b16d3a1030e7",
+    "src/market_research_core/errors.py": "47ef9cf26accc535cf79d9662481520d086bb2497916dcd95b2d6058199e076a",
+    "src/market_research_core/execution.py": "5a621be40a6238e5dbad7cfbd5a026055a5b2ec6e4e5b7ddf0677d7a7f5085ee",
+    "src/market_research_core/ibkr.py": "0f3ae9e175c5fd861166bf9d7d923669878d5bb6a4af70b0b220eeb3043429f8",
+    "src/market_research_core/ibkr_tsm.py": "55252d55b04ed292a412222955c61db03ad9429057e6416733826b2c78a1e1c7",
+    "src/market_research_core/ibkr_tsm_audit.py": "70a3ab6903bcbdbac8c2c19024a1645bbf189c996df0c61d7c71ec1c22700b85",
+    "src/market_research_core/models.py": "fccfa95a31c03e114d7ddd357ff94afddfae20b38f2d2a63dcd5d08f07e6d2a6",
+    "src/market_research_core/policy.py": "55b5f0697e2a42cfbfb7a02d6ffc7c3ad6b4f0feec6c2f8c8731952bfac23d70",
+    "src/market_research_core/smoke.py": "de85aca48a97f643e0bc4fc1a3db53453f9d5bda73099ece36dfe07f0b6d75d7",
+    "src/market_research_core/snapshot.py": "60845d741ac3c3cf768d888fcf794e4d69035a53e525114441e13f841f0ab2cd",
+    "src/market_research_core/taiwan.py": "5e880f9e541f0a9a21a28924077d0a9b446a08e6547475c12572f2176ec4e35c",
+    "src/market_research_core/temporal.py": "45094ba35ea8ace97830e4ef9b180438fa8bcd9a76a94918efd3bf1b3e84117b",
+    "src/market_research_core/txf.py": "e30b1a69b69337e1e4b409c4367f62d5a9534f2702540e48402dcbeb3c2dee7f",
+    "tests/test_data_access.py": "55179e4065dcb029b45929893abba501b57bbb6bede83ec5b017af96e95f7c76",
+    "tests/test_execution.py": "665f83cacc766beaa1a9493b3dc478c0d90e4c52fa08f82def10a075722cdfe1",
+    "tests/test_ibkr_tsm_audit.py": "2c637295247d531987de829c5a0881173faa13c1b3ee611830bcf918446d0509",
+    "tests/test_ibkr_tsm_gate.py": "26f1807071f5ef1534a8e80443cb27961354d0dd87e06097a335bcc8d0f92b4a",
+    "tests/test_m3a4_final.py": "84bf40f00a79cc17efb593267caecb08767202e094b42cefac0ff7df4480f3d7",
+    "tests/test_phase2.py": "bdef337650ad7436b31ee001b1de9dab2778154c51f89afc01a68ec3fe52558f",
+    "tests/test_smoke.py": "cb4e99c9993381ba11648a2992bcda5e89756dc2fb974002658a30dc42efef21",
+    "tests/test_txf.py": "1a927cbbef35a71237550045bd166db9a8dd608ccd0d9d4d267b130ae076231f"
+  },
+  "scope": {
+    "market_download": false,
+    "historical_final_gate_rerun": false,
+    "real_tsm_backtest": false,
+    "oracle_expectations_modified": false,
+    "agent_repository_modified": false,
+    "m3a3_seven_date_evidence": "USER_REPORTED_COMPLETE_NOT_RERUN",
+    "notion_update": "PENDING_NO_CONNECTOR"
+  },
+  "remaining_external_conditions": [
+    "Research-owner acceptance of conservative model",
+    "Actual account/rate evidence and dated regulatory schedule",
+    "Official Fixed cap rule verification",
+    "Governed cost and holdout approval",
+    "Agent minimum adapter acceptance",
+    "Notion handoff publication"
+  ]
+}

@@ -114,3 +114,13 @@ One bounded run of this committed script against the existing mounted Parquet, p
 A final official-source check found that the legacy TWS API documentation directly describes `reqHistoricalData` and the returned `Bar.Time` value, but specifies only the time representation/time zone and says OHLCV values represent the market state during the covered candlestick period; it does not state that a 1-minute `Bar.Time` is the period start or end. IBKR's separate protobuf `HistoricalDataBar.date` reference does say “The start date of the bar’s covered data.” The reviewed snapshot downloader uses the legacy TWS `reqHistoricalData`/EWrapper.Bar path, and no acquisition receipt pins a protobuf route or schema. Therefore the protobuf field definition is not transferable evidence for this snapshot; label verdict remains UNKNOWN.
 
 Sources: [IBKR TWS Historical Bar Data](https://interactivebrokers.github.io/tws-api/historical_bars.html), [IBKR TWS Bar.Time](https://interactivebrokers.github.io/tws-api/classIBApi_1_1Bar.html), [IBKR protobuf HistoricalDataBar](https://ibkrcampus.eu/docs/tws-api/protobuf/historical-data-bar).
+## M3-A.4 FINAL engineering handoff
+
+The explicit `CONSERVATIVE_LABEL_AGNOSTIC` research model and configurable
+Fixed/componentized cost API are documented in
+[`M3A4_TEMPORAL_COST_CONTRACT.md`](M3A4_TEMPORAL_COST_CONTRACT.md), with machine
+results in [`diagnostics/m3a4_final.json`](diagnostics/m3a4_final.json).
+The user reports M3-A.3 bounded extraction completed; no raw rows are read again.
+Engineering acceptance does not confirm START/END labels or auction attribution,
+prove measured publication latency, approve account rates, or authorize formal
+market execution. The ordinary MarketDataClient gate is unchanged.

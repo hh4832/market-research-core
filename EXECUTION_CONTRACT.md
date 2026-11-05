@@ -106,3 +106,11 @@ The backward-compatible CostProfile now represents per-share commission with a p
 ### TSM gate outcome
 
 For the fixed snapshot `20261101_205431_06359faf7ef4_IBKR_FINAL_GATE_FULL`, use only bounded read-only diagnostics on the original timestamp. Do not derive bar boundaries, availability, session, or fills. Synthetic session and cost regressions do not constitute a real-data ExecutionEngine probe. Formal TSM execution remains blocked pending timestamp/receipt evidence, owner acceptance of an as-of policy, and approved cost and eligibility inputs.
+
+## M3-A.4 conservative research and configurable costs
+
+See [the exact released API and field contract](docs/M3A4_TEMPORAL_COST_CONTRACT.md).
+`CONSERVATIVE_LABEL_AGNOSTIC` preserves UNKNOWN source labels and uses explicit
+START/END uncertainty envelopes. It is always RESEARCH_ONLY. The unchanged
+MarketDataClient TSM default remains fail-closed; source-label confirmation and
+formal market approval are separate from this opt-in research model.

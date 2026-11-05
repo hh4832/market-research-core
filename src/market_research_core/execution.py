@@ -15,7 +15,8 @@ from typing import Any, Iterable, Literal
 
 import pandas as pd
 
-from .costs import CostProfile, calculate_cost_components, adverse_fill_price
+from .costs import CostProfile, calculate_fill_costs, adverse_fill_price
+from .temporal import TemporalPolicy, validate_conservative_bars
 
 
 @dataclass(frozen=True)
@@ -58,7 +59,7 @@ class ExecutionConfig:
     session_semantics: Literal["CONFIRMED", "UNKNOWN"]
     timestamp_timezone: str
     same_timestamp_open_assumption: bool = False
-    available_at_policy: Literal["OBSERVED", "BAR_END_STRICT_LATER", "UNKNOWN"] = "OBSERVED"
+    available_at_policy: Literal["OBSERVED", "BAR_END_STRICT_LATER", "UNKNOWN", "CONSERVATIVE_LABEL_AGNOSTIC"] = "OBSERVED"
     initial_margin_per_contract: float | None = None
     max_gross_notional: float | None = None
     exclusion_windows: tuple[tuple[Any, Any, str], ...] = ()
@@ -73,15 +74,24 @@ class ExecutionConfig:
     seed: int | None = None
     window_start: Any = None
     window_end: Any = None
+    temporal_policy: TemporalPolicy | None = None
 
     def __post_init__(self) -> None:
         if self.initial_cash <= 0:
             raise ValueError("initial_cash must be positive")
         if not math.isfinite(self.cost_multiplier) or self.cost_multiplier < 0:
             raise ValueError("cost_multiplier must be finite and non-negative")
-        if self.bar_label == "UNKNOWN" or self.session_semantics == "UNKNOWN":
+        conservative = self.available_at_policy == 'CONSERVATIVE_LABEL_AGNOSTIC'
+        if conservative:
+            if not isinstance(self.temporal_policy, TemporalPolicy) or self.bar_label != 'UNKNOWN':
+                raise ValueError('conservative mode requires explicit TemporalPolicy and UNKNOWN source label')
+            if self.same_timestamp_open_assumption or self.timestamp_timezone != 'America/New_York':
+                raise ValueError('conservative mode forbids same-time execution and requires NYSE timezone')
+        elif self.temporal_policy is not None:
+            raise ValueError('temporal_policy requires its conservative mode')
+        if (self.bar_label == "UNKNOWN" and not conservative) or self.session_semantics == "UNKNOWN":
             raise ValueError("formal execution is blocked when bar label or session semantics are UNKNOWN")
-        if self.available_at_policy not in {"OBSERVED", "BAR_END_STRICT_LATER", "UNKNOWN"}:
+        if self.available_at_policy not in {"OBSERVED", "BAR_END_STRICT_LATER", "UNKNOWN", "CONSERVATIVE_LABEL_AGNOSTIC"}:
             raise ValueError("unsupported available_at_policy")
         if self.available_at_policy == "BAR_END_STRICT_LATER" and self.same_timestamp_open_assumption:
             raise ValueError("BAR_END_STRICT_LATER forbids same-timestamp bar-open execution")
@@ -100,6 +110,11 @@ class ExecutionResult:
     order_events: pd.DataFrame
     provenance: dict[str, Any]
     status: str
+
+    @property
+    def ledger(self) -> pd.DataFrame:
+        """One row per fill; monetary component debits and temporal evidence."""
+        return self.fills.copy()
 
 
 _REQUIRED_COLUMNS = {
@@ -147,6 +162,8 @@ class ExecutionEngine:
         missing = _REQUIRED_COLUMNS - set(bars.columns)
         if missing:
             raise ValueError(f"bars missing required execution columns: {sorted(missing)}")
+        if config.temporal_policy is not None:
+            validate_conservative_bars(bars, config.temporal_policy)
         frame = bars.copy()
         if "available_at_policy" in frame.columns:
             row_policies = set(frame["available_at_policy"].dropna().astype(str))
@@ -188,6 +205,9 @@ class ExecutionEngine:
         if config.available_at_policy == "BAR_END_STRICT_LATER":
             assumptions.append("available_at is conservatively modeled at bar_end; actual historical publication latency is UNKNOWN; equal-time next-bar opens are excluded")
 
+        if config.temporal_policy is not None:
+            assumptions.append(config.temporal_policy.assumption)
+
         # Build each order's candidate bar set first, then advance all candidate
         # orders on the shared bar_start timeline. State changes happen only at
         # the bar where a fill occurs, never in order-creation order.
@@ -197,6 +217,16 @@ class ExecutionEngine:
             signal_time = _ts(order.signal_time, config.timestamp_timezone)
             available = _ts(order.signal_available_at, config.timestamp_timezone)
             order_time = _ts(order.order_time, config.timestamp_timezone)
+            if config.temporal_policy is not None:
+                signal_rows = frame[frame['modeled_available_at'].eq(signal_time)]
+                if signal_rows.empty or not signal_rows['signal_eligible'].all() or available < signal_rows['modeled_available_at'].max():
+                    rejects.append({'order_id': oid, 'reason': 'PIT_VIOLATION',
+                                    'detail': 'signal must reference a complete observed conservative bucket by modeled completion'})
+                    continue
+                if order.order_type != 'MARKET':
+                    rejects.append({'order_id': oid, 'reason': 'UNSUPPORTED_CONSERVATIVE_ORDER_TYPE',
+                                    'detail': 'intrabar LIMIT simulation is not approved under unknown labels'})
+                    continue
             if available < signal_time or order_time < available:
                 rejects.append({"order_id": oid, "reason": "PIT_VIOLATION", "detail": "signal_available_at/order_time precedes prior information"})
                 continue
@@ -217,6 +247,8 @@ class ExecutionEngine:
             ]
             if not config.same_timestamp_open_assumption:
                 matching = matching[matching["bar_start"] > max(available, order_time)]
+            if config.temporal_policy is not None:
+                matching = matching[matching['session_close'].eq(signal_rows['session_close'].max())]
             expiry = None
             if order.time_in_force == "NEXT_BAR":
                 matching = matching.iloc[:1]
@@ -231,6 +263,7 @@ class ExecutionEngine:
             records.append({
                 "idx": order_idx, "oid": oid, "order": order,
                 "signal_time": signal_time, "available": available, "order_time": order_time,
+                "signal_source_timestamp": signal_rows['source_timestamp'].iloc[0] if config.temporal_policy else None,
                 "target_key": (order.strategy_id, order.symbol, order.contract) if order.target_position is not None else None,
                 "expiry": expiry,
                 "candidate_rows": {pd.Timestamp(row["bar_start"]): row for _, row in matching.iterrows()},
@@ -327,8 +360,22 @@ class ExecutionEngine:
                     continue
 
                 reason: str | None = None
+                cost_meta = cost_profile.configuration_metadata
+                fill_date = bar['bar_start'].date().isoformat()
+                cost_date_ok = not cost_meta or (cost_meta['effective_from'] <= fill_date and
+                                (cost_meta['effective_to'] is None or fill_date <= cost_meta['effective_to']))
+                daytrade_ok = not cost_meta.get('daytrade_evidence') or side != 'SELL' or (
+                    cost_meta['as_of'] == fill_date and qty <= sum(
+                        lot['signed_qty'] for lot in lots.get(key, [])
+                        if lot['signed_qty'] > 0 and lot['entry_ts'].date() == bar['bar_start'].date()))
                 if bar["bar_start"] < bar["session_open"] or bar["bar_start"] >= bar["session_close"]:
                     reason = "OUTSIDE_SESSION"
+                elif not cost_date_ok:
+                    reason = 'COST_RATE_OUTSIDE_EFFECTIVE_DATES'
+                elif cost_meta and (order.symbol != cost_meta['symbol'] or order.market != cost_meta['applicability']['market']):
+                    reason = 'COST_PROFILE_MARKET_MISMATCH'
+                elif not daytrade_ok:
+                    reason = 'DAYTRADE_TAX_NOT_QUALIFIED'
                 elif not bool(bar["data_exists"]) or not bool(bar["backtest_eligible"]):
                     reason = "BAR_NOT_ELIGIBLE"
                 elif float(bar["volume"]) <= 0:
@@ -371,9 +418,10 @@ class ExecutionEngine:
                 fill_price = adverse_fill_price(raw_price, side, cost_profile, config.cost_multiplier)
                 if order.order_type == "LIMIT":
                     fill_price = min(fill_price, float(order.limit_price)) if side == "BUY" else max(fill_price, float(order.limit_price))
-                fee, tax, regulatory_fee = calculate_cost_components(fill_price, qty, side, cost_profile)
                 cost_multiplier = Decimal(str(config.cost_multiplier))
-                fee, tax, regulatory_fee = fee * cost_multiplier, tax * cost_multiplier, regulatory_fee * cost_multiplier
+                cost_parts = {k: v * cost_multiplier for k, v in calculate_fill_costs(fill_price, qty, side, cost_profile).items()}
+                fee = cost_parts['commission'] + cost_parts['exchange_fee'] + cost_parts['clearing_fee']
+                tax, regulatory_fee = cost_parts['transaction_tax'], cost_parts['regulatory_fee']
                 signed_delta = qty if side == "BUY" else -qty
                 current_net = sum(lot["signed_qty"] for lot in lots.get(key, []))
                 resulting_net = current_net + signed_delta
@@ -394,10 +442,39 @@ class ExecutionEngine:
                     "order_id": oid, "symbol": order.symbol, "market": order.market,
                     "contract": order.contract, "exec_ts": bar["bar_start"], "side": side,
                     "qty": qty, "fill_price": fill_price, "fee": fee, "tax": tax,
+                    "signal_time": record['signal_time'], "signal_available_at": record['available'],
+                    "order_time": record['order_time'],
                     "regulatory_fee": regulatory_fee,
                     "strategy_id": order.strategy_id, "experiment_id": order.experiment_id,
                     "session": bar["session"], "execution_assumption": "SAME_TIMESTAMP_BAR_OPEN" if bar["bar_start"] == record["available"] else "NEXT_ELIGIBLE_BAR_OPEN",
                 }
+                fill.update(cost_parts)
+                fill['raw_price'] = raw_price
+                fill['price_adjustment_cost'] = abs(Decimal(str(fill_price)) - Decimal(str(raw_price))) * Decimal(str(qty)) * Decimal(str(multiplier))
+                monetary_scale = Decimal(str(qty)) * Decimal(str(multiplier))
+                if cost_profile.equity_slippage_bps is not None:
+                    slip_move = Decimal(str(raw_price)) * Decimal(str(cost_profile.equity_slippage_bps)) / Decimal('10000')
+                else:
+                    slip_move = Decimal(str(cost_profile.slippage_ticks)) * Decimal(str(cost_profile.tick_size))
+                spread_move = Decimal(str(raw_price)) * Decimal(str(cost_profile.half_spread_bps or 0)) / Decimal('10000')
+                fill['slippage_cost'] = slip_move * monetary_scale * cost_multiplier
+                fill['spread_cost'] = spread_move * monetary_scale * cost_multiplier
+                fill['tick_rounding_cost'] = fill['price_adjustment_cost'] - fill['slippage_cost'] - fill['spread_cost']
+                fill['explicit_cost'] = fee + tax + regulatory_fee
+                fill['commission_scope'] = cost_profile.fee_mode or 'LEGACY'
+                fill['cost_profile_id'] = cost_profile.profile_id
+                fill['cost_profile_version'] = cost_profile.version
+                fill['cost_profile_sha256'] = cost_profile.sha256
+                if config.temporal_policy is not None:
+                    fill.update(temporal_policy_id=config.temporal_policy.policy_id,
+                                temporal_policy_version=config.temporal_policy.version,
+                                temporal_policy_sha256=config.temporal_policy.sha256,
+                                temporal_assumption=config.temporal_policy.assumption,
+                                source_timestamp=bar['source_timestamp'], source_timestamp_label='UNKNOWN',
+                                modeled_available_at=record['signal_time'], signal_source_timestamp=record['signal_source_timestamp'],
+                                candidate_modeled_available_at=bar['modeled_available_at'],
+                                candidate_possible_open_latest=bar['possible_open_latest'],
+                                execution_eligibility_scope='RESEARCH_ONLY')
                 fills.append(fill)
                 record["done"] = True
                 record["signed_remaining"] = 0.0
@@ -549,10 +626,10 @@ class ExecutionEngine:
         profile_sha = cost_profile.sha256
         provenance = {
             "engine_name": "market-research-core.ExecutionEngine", "engine_git_sha": config.core_commit_sha,
-            "engine_version": "2.1.0", "execution_convention": "oracle-execution-convention-v1",
+            "engine_version": "2.2.0", "execution_convention": "oracle-execution-convention-v1",
             "dataset_snapshot_id": config.dataset_snapshot_id, "dataset_producer_sha": config.dataset_producer_sha,
             "dataset_verdict": config.dataset_verdict, "cost_profile_id": cost_profile.profile_id,
-            "cost_profile_sha256": profile_sha, "cost_profile_approval": cost_profile.approval_status,
+            "cost_profile_version": cost_profile.version, "cost_profile_sha256": profile_sha, "cost_profile_approval": cost_profile.approval_status,
             "cost_profile_components": cost_profile.components,
             "exclusions_applied": [label for _, _, label in config.exclusion_windows],
             "strategy_ids": sorted({o.strategy_id for o in orders}), "experiment_ids": sorted({o.experiment_id for o in orders}),
@@ -564,6 +641,15 @@ class ExecutionEngine:
             "assumptions": assumptions,
             "permitted_usage_scope": config.permitted_usage_scope,
         }
+        if config.temporal_policy is not None:
+            provenance.update(temporal_policy_id=config.temporal_policy.policy_id,
+                              temporal_policy_version=config.temporal_policy.version,
+                              temporal_policy_sha256=config.temporal_policy.sha256,
+                              temporal_policy=asdict(config.temporal_policy), source_timestamp_label='UNKNOWN',
+                              modeled_available_at_rule='LATEST_START_END_COMPLETION',
+                              execution_eligibility_scope='RESEARCH_ONLY')
+        provenance['cost_configuration'] = cost_profile.configuration_metadata
+        provenance['fee_mode'] = cost_profile.fee_mode
         formal_eligible = (
             config.permitted_usage_scope == "BACKTEST"
             and config.available_at_policy == "OBSERVED"

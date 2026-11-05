@@ -1,0 +1,59 @@
+{
+  "schema_version": "1.0.0",
+  "configuration_sha256": "7c8ce6409a206a5d2db6b30648141ef63dc3f558a60850fe5dcc939130fa578c",
+  "profile": {
+    "profile_id": "txf",
+    "version": "1.0.0",
+    "instrument_type": "FUTURES",
+    "approval_status": "DRAFT",
+    "source_evidence": "user-request:M3-A.4-INITIAL-RESEARCH-ASSUMPTIONS; NOT independently verified",
+    "basis": "ASSUMED",
+    "equity_commission_rate": 0,
+    "minimum_commission": 0,
+    "sell_tax_rate": 0,
+    "futures_fee_per_contract_per_side": 50,
+    "futures_transaction_tax_rate": 2e-05,
+    "contract_multiplier": 200,
+    "tick_size": 1,
+    "slippage_ticks": 1,
+    "fee_rounding": "HALF_UP",
+    "tax_rounding": "HALF_UP",
+    "component_basis": {
+      "contract_multiplier": "ASSUMED",
+      "equity_commission_rate": "ASSUMED",
+      "fee_rounding": "ASSUMED",
+      "futures_fee_per_contract_per_side": "ASSUMED",
+      "futures_transaction_tax_rate": "ASSUMED",
+      "minimum_commission": "ASSUMED",
+      "sell_tax_rate": "ASSUMED",
+      "slippage_ticks": "ASSUMED",
+      "tax_rounding": "ASSUMED",
+      "tick_size": "ASSUMED"
+    },
+    "component_evidence": {},
+    "component_approval_status": {},
+    "commission_scheme": "FIXED",
+    "fee_mode": "ALL_IN"
+  },
+  "applicability": {
+    "symbols": [
+      "TXF"
+    ],
+    "market": "TXF",
+    "currency": "TWD",
+    "effective_from": "2025-01-01",
+    "effective_to": null,
+    "assumption_status": "ASSUMED",
+    "evidence_ref": "user-request:M3-A.4-INITIAL-RESEARCH-ASSUMPTIONS",
+    "verification_status": "UNVERIFIED",
+    "stress_slippage": [
+      0,
+      1,
+      2
+    ],
+    "listed_commission_rate": null,
+    "qualified_daytrade_tax_rate": null,
+    "daytrade_conditions": []
+  },
+  "regulatory_schedule": []
+}

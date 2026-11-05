@@ -179,5 +179,7 @@
       },
       "overall_snapshot_verdict": "UNKNOWN"
     }
-  }
+  },
+  "m3a4_final_ref": "docs/diagnostics/m3a4_final.json",
+  "m3a4_note": "Opt-in conservative research model added; source label and auction UNKNOWN; formal_execution remains NO_GO. Engineering acceptance is separate."
 }
