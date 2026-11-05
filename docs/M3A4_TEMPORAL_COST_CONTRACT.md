@@ -126,3 +126,19 @@ After reviewing this exact Core commit, Agent maps policy/config/pins to the rel
 ## Notion handoff
 
 This contract and `docs/diagnostics/m3a4_final.json` are prepared Phase3 handoff content. Actual Notion update is PENDING: no Notion connector exists in this session. No Notion page was claimed updated. Stop after M3-A.4; no M3-A.5, data validation project or new feature phase is opened.
+
+## Final engineering acceptance
+
+**GO for conservative research timing and Fixed/componentized cost calculation.**
+Implementation `15ed2d934db8b772557548eab3cc8cafe1d8db3e`: Python 3.11.17 and 3.12.14
+local full regressions each 84 PASS, zero failed/skipped, coverage84%.
+[PR CI run 41967446695](https://github.com/hh4832/market-research-core/actions/runs/41967446695)
+completed both Python3.11 and3.12 jobs successfully. The closure commit updates
+only this acceptance record and machine diagnostics; it does not add a feature.
+
+**Formal execution remains NO-GO.** Owner acceptance, dated/account-approved fees
+(including the missing IBKR regulatory rate and unverified Fixed cap rule),
+holdout approval and minimum Agent adapter acceptance remain external conditions.
+Tiered commission is unsupported and fails closed. Core API is documented and
+ready for the bounded Agent acceptance, not a claim that the Agent already
+supports it. No Notion connector is available; the handoff remains prepared here.

@@ -54,7 +54,16 @@
     },
     "coverage_percent": 84,
     "command": "python -m pytest -o addopts= -q --cov=market_research_core --cov-report=term-missing",
-    "github_ci": "PENDING_PUSH"
+    "github_ci": {
+      "status": "PASS",
+      "python_versions": [
+        "3.11",
+        "3.12"
+      ],
+      "run_url": "https://github.com/hh4832/market-research-core/actions/runs/41967446695",
+      "verified_commit": "15ed2d934db8b772557548eab3cc8cafe1d8db3e",
+      "verification": "PUBLIC_GITHUB_MATRIX_TWO_JOBS_COMPLETED_SUCCESSFULLY"
+    }
   },
   "integrity": {
     "configs/cost_profiles/ibkr_es.json": "4a2bd1ecb6b0d39568080fedfd9483281c1de5da3d4f25637d0c4cd1fd391a5a",
@@ -106,5 +115,30 @@
     "Governed cost and holdout approval",
     "Agent minimum adapter acceptance",
     "Notion handoff publication"
+  ],
+  "engineering_verdict": "GO",
+  "engineering_scope": "CONSERVATIVE_RESEARCH_MODEL_AND_FIXED_CONFIGURABLE_COST_CALCULATION",
+  "implementation_sha": "15ed2d934db8b772557548eab3cc8cafe1d8db3e",
+  "modified_files": [
+    ".github/workflows/ci.yml",
+    "EXECUTION_CONTRACT.md",
+    "README.md",
+    "configs/cost_profiles/ibkr_es.json",
+    "configs/cost_profiles/ibkr_fixed_equity.json",
+    "configs/cost_profiles/ibkr_nq.json",
+    "configs/cost_profiles/taiwan_equity.json",
+    "configs/cost_profiles/txf.json",
+    "configs/cost_profiles/txf.yaml",
+    "docs/M3A4_TEMPORAL_COST_CONTRACT.md",
+    "docs/M3A_IBKR_TSM_READINESS.md",
+    "docs/diagnostics/m3a4_final.json",
+    "docs/diagnostics/m3a_ibkr_tsm_readiness.json",
+    "pyproject.toml",
+    "src/market_research_core/__init__.py",
+    "src/market_research_core/cost_config.py",
+    "src/market_research_core/costs.py",
+    "src/market_research_core/execution.py",
+    "src/market_research_core/temporal.py",
+    "tests/test_m3a4_final.py"
   ]
 }
