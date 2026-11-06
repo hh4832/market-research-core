@@ -45,7 +45,22 @@
         "3.12"
       ]
     },
-    "agent_implementation": "PENDING_FINAL_CI_OBSERVATION"
+    "agent_implementation": {
+      "url": "https://github.com/hh4832/strategy-research-agent/actions/runs/42198357047",
+      "sha": "9e368f8925a425f7dae8921291c168b5d197f33a",
+      "status": "PASS",
+      "new_nonconsuming_job": "development-snapshot-preflight"
+    },
+    "core_notebook_and_tests": {
+      "url": "https://github.com/hh4832/market-research-core/actions/runs/42198658069",
+      "sha": "94a1f9faf485e65c46304f37c75da28b3472fb9e",
+      "status": "PASS",
+      "python": [
+        "3.11",
+        "3.12"
+      ]
+    },
+    "final_evidence_only_commit_checks": "SEE_PR_4_AND_5; FINAL_HEAD_SHA_REPORTED_IN_DELIVERY"
   },
   "required_human_approvals": [
     {
