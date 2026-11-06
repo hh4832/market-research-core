@@ -1,0 +1,17 @@
+{
+  "scope": "RESEARCH_ONLY",
+  "status": "PENDING_EXISTING_MANIFEST_AND_SEC_TAF_RECORDS",
+  "window": {"start": "2024-06-03", "end": "2024-06-28"},
+  "snapshot_id": "20261101_205431_06359faf7ef4_IBKR_FINAL_GATE_FULL",
+  "manifest_path": null,
+  "manifest_sha256": null,
+  "manifest_layout": null,
+  "integrity_receipt": null,
+  "holdout": null,
+  "existing_sec_cost_configuration": null,
+  "existing_taf_rate_record": null,
+  "slippage_bps": {"LOW": 1, "BASE": 2, "STRESS": 4},
+  "cat_usd_per_share_per_side": {"BASE": "0.00005", "STRESS": "0.00010"},
+  "cat_is_confirmed_broker_cost_or_upper_bound": false,
+  "taf_model": "CONSERVATIVE_TAF_BOUND_BOTH_SIDES_NO_CAP"
+}

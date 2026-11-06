@@ -1,0 +1,229 @@
+{
+  "code_pin": "ba8f23334f95060a7122226542e3110daa2e944b",
+  "core_sha": "e31c57b6c9dd599d808516ce6664628bdc79319e",
+  "kind": "PHASE4A_SNAPSHOT_PROBE",
+  "result": {
+    "blockers": [
+      {
+        "code": "SHA_REQUIRED",
+        "message": "no pinned manifest sha256 (observed d960602cff24f7350b056d69e19d8e0b8734cdad266d3782bc56ebc507818828); pin it in a reviewed config"
+      },
+      {
+        "code": "MANIFEST_LAYOUT",
+        "message": "existing manifest has no field for 'snapshot_id' (no pointer can be bound)"
+      },
+      {
+        "code": "MANIFEST_LAYOUT",
+        "message": "existing manifest has no field for 'producer_sha' (no pointer can be bound)"
+      },
+      {
+        "code": "MANIFEST_LAYOUT",
+        "message": "existing manifest has no field for 'parquet_path' (no pointer can be bound)"
+      },
+      {
+        "code": "MANIFEST_LAYOUT",
+        "message": "existing manifest has no field for 'columns' (no pointer can be bound)"
+      },
+      {
+        "code": "MANIFEST_LAYOUT",
+        "message": "existing manifest has no field for 'arrow_schema' (no pointer can be bound)"
+      },
+      {
+        "code": "HOLDOUT_ROW_GROUP_OVERLAP",
+        "message": "candidate row group 1 spans 2021-12-14..2026-05-26 (1048576 rows): outside authorized window ('2024-05-29', '2024-06-28') overlaps holdout; Core would refuse to decode it"
+      },
+      {
+        "code": "INTEGRITY_RECEIPT",
+        "message": "no trusted FileIntegrityReceipt; Core's verify_file_bytes would read the entire file's bytes (including holdout bytes) and needs explicit research-lead authorization"
+      }
+    ],
+    "core_identity": {
+      "core_git_sha": "e31c57b6c9dd599d808516ce6664628bdc79319e",
+      "core_tree_dirty": null
+    },
+    "preflight": {
+      "blockers": [],
+      "governance": {
+        "authorization": "APPROVED",
+        "authorization_uses": 0,
+        "core": {
+          "baseline_sha": "699e3ad59951bbebb769bb69170be8d9a1a96c01",
+          "phase4a_sha": "e31c57b6c9dd599d808516ce6664628bdc79319e"
+        },
+        "cost_window": {
+          "sec_rate": 2.78e-05,
+          "sec_version": "SEC31-2024-05-22",
+          "taf_per_share": 0.000166
+        },
+        "formal": {
+          "gate_version": "2026-11-05.4",
+          "gates": {
+            "COST_APPROVAL": "FAIL",
+            "COST_MODEL_COMPATIBILITY": "PASS",
+            "DATA_QUALITY": "PASS",
+            "FORMAL_EXECUTION_ELIGIBILITY": "FAIL",
+            "HOLDOUT_APPROVAL": "FAIL",
+            "TEMPORAL_SAFETY": "UNKNOWN"
+          },
+          "market_status": "NO_GO"
+        },
+        "holdout_lock": {
+          "approved_by": "hh4832",
+          "end": "2026-10-17T00:00:00-04:00",
+          "lock_id": "HOLDOUT-TSM-15M-v1",
+          "start": "2025-01-01T00:00:00-05:00"
+        }
+      },
+      "status": "READY_FOR_CORE_INTEGRATION"
+    },
+    "probe": {
+      "blockers": [
+        {
+          "code": "SHA_REQUIRED",
+          "message": "no pinned manifest sha256 (observed d960602cff24f7350b056d69e19d8e0b8734cdad266d3782bc56ebc507818828); pin it in a reviewed config"
+        },
+        {
+          "code": "MANIFEST_LAYOUT",
+          "message": "existing manifest has no field for 'snapshot_id' (no pointer can be bound)"
+        },
+        {
+          "code": "MANIFEST_LAYOUT",
+          "message": "existing manifest has no field for 'producer_sha' (no pointer can be bound)"
+        },
+        {
+          "code": "MANIFEST_LAYOUT",
+          "message": "existing manifest has no field for 'parquet_path' (no pointer can be bound)"
+        },
+        {
+          "code": "MANIFEST_LAYOUT",
+          "message": "existing manifest has no field for 'columns' (no pointer can be bound)"
+        },
+        {
+          "code": "MANIFEST_LAYOUT",
+          "message": "existing manifest has no field for 'arrow_schema' (no pointer can be bound)"
+        },
+        {
+          "code": "HOLDOUT_ROW_GROUP_OVERLAP",
+          "message": "candidate row group 1 spans 2021-12-14..2026-05-26 (1048576 rows): outside authorized window ('2024-05-29', '2024-06-28') overlaps holdout; Core would refuse to decode it"
+        },
+        {
+          "code": "INTEGRITY_RECEIPT",
+          "message": "no trusted FileIntegrityReceipt; Core's verify_file_bytes would read the entire file's bytes (including holdout bytes) and needs explicit research-lead authorization"
+        }
+      ],
+      "observed": {
+        "layout_resolved": {
+          "parquet_sha256": "572d19476eecd38020da8ddbfbd5f7b128c7cd79d807e4f16fd787a66a8c96e7",
+          "symbol": "TSM"
+        },
+        "manifest": {
+          "gate": "IBKR_FINAL_GATE",
+          "git_sha": "06359faf7ef4",
+          "mode": "FULL",
+          "overall_verdict": "SCOPED_GO",
+          "relative_path": "final_gate_manifest.json",
+          "schema_version": "1.0.0",
+          "sha256": "d960602cff24f7350b056d69e19d8e0b8734cdad266d3782bc56ebc507818828",
+          "size": 2986342,
+          "top_level_keys": [
+            "folder_ids",
+            "gate",
+            "git_sha",
+            "historical_runs_overwritten",
+            "instrument_verdicts",
+            "manifest_sha256_before_archive_url",
+            "mode",
+            "overall_verdict",
+            "raw_data_redownloaded_from_ibkr",
+            "results",
+            "rules",
+            "run_time_taipei",
+            "schema_version",
+            "source_files_modified"
+          ],
+          "tsm_result_keys": [
+            "chunks_listed",
+            "chunks_scanned",
+            "corporate_action_candidates",
+            "end_utc",
+            "errors",
+            "exact_duplicate_rows",
+            "published_sha256",
+            "rows",
+            "rth_missing_intervals",
+            "rth_missing_minutes",
+            "sources",
+            "start_utc",
+            "symbol",
+            "trading_day_gap_candidates",
+            "verdict"
+          ],
+          "tsm_result_pointer": "/results/2",
+          "tsm_result_scalars": {
+            "end_utc": "2026-10-16T23:59:00+00:00",
+            "published_sha256": "572d19476eecd38020da8ddbfbd5f7b128c7cd79d807e4f16fd787a66a8c96e7",
+            "rows": 2193372,
+            "start_utc": "2016-10-19T08:43:00+00:00",
+            "symbol": "TSM",
+            "verdict": "GO"
+          }
+        },
+        "parquet": {
+          "arrow_schema": {
+            "close": "double",
+            "high": "double",
+            "low": "double",
+            "open": "double",
+            "timestamp_utc": "timestamp[us, tz=UTC]",
+            "volume": "double"
+          },
+          "created_by": "parquet-cpp-arrow version 23.0.1",
+          "num_row_groups": 3,
+          "num_rows": 2193372,
+          "relative_path": "tsm_normalized.parquet",
+          "row_groups": [
+            {
+              "candidate": false,
+              "first_date": "2016-10-19",
+              "index": 0,
+              "last_date": "2021-12-14",
+              "rows": 1048576
+            },
+            {
+              "candidate": true,
+              "first_date": "2021-12-14",
+              "index": 1,
+              "inside_authorized_window": false,
+              "last_date": "2026-05-26",
+              "overlaps_holdout": true,
+              "rows": 1048576
+            },
+            {
+              "candidate": false,
+              "first_date": "2026-05-26",
+              "index": 2,
+              "last_date": "2026-10-16",
+              "rows": 96220
+            }
+          ],
+          "size": 29363599,
+          "timestamp_column": "timestamp_utc",
+          "timestamp_tz": "UTC"
+        },
+        "parquet_path_source": "diagnostic_only (observed Drive file; Core would not accept it without a manifest path)",
+        "snapshot_root_basename": "20261101_205431_06359faf7ef4_IBKR_FINAL_GATE_FULL"
+      },
+      "status": "BLOCKED"
+    },
+    "profiles": {
+      "BASE": "ea2cb1932ba83eadcdc12720a56d7404d30686a03c6fe6ce10482cceca63c529",
+      "CAT_STRESS": "bd42c2661b3bf6dcf1b7d9f68b51762af2682ff13035384a49a340b1d574cbfc",
+      "LOW": "4111a7d0798162ff2c0cb6a8fd7f4e15f59d8f830e70f04da7b41e660efb101b",
+      "STRESS": "80c00d97c8dc333ba7d39e54782e3af123cc09a46ca5703331faef82e105c401"
+    },
+    "slot_consumed": false,
+    "status": "BLOCKED_BEFORE_CONSUMPTION"
+  },
+  "slot_consumed": false,
+  "snapshot_root": "/content/drive/MyDrive/00Quant_Research/data/00_Quant_Research_Hub/20261101_205431_06359faf7ef4_IBKR_FINAL_GATE_FULL"
+}
