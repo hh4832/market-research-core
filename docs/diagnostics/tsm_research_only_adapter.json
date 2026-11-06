@@ -4,7 +4,7 @@
   "verdict": "SCOPED_GO",
   "baseline_sha": "699e3ad59951bbebb769bb69170be8d9a1a96c01",
   "branch": "feature/phase4a-tsm-native-research-adapter",
-  "core_final_commit_sha": null,
+  "core_final_commit_sha": "07c13e4820a0550be5616562615206084ef4947a",
   "core_commit_resolution": "market_research_core.tsm_native.core_code_identity()",
   "policy": {
     "id": "CONSERVATIVE_LABEL_AGNOSTIC",
@@ -76,8 +76,20 @@
     "fixtures_are_not_real_snapshot_evidence": true
   },
   "github": {
-    "ci": "PENDING_PUSH",
-    "phase4_pr": "PENDING_API_FORBIDDEN",
+    "ci": {
+      "status": "PASS",
+      "python_versions": [
+        "3.11",
+        "3.12"
+      ],
+      "run_url": "https://github.com/hh4832/market-research-core/actions/runs/42142215511",
+      "verified_commit": "07c13e4820a0550be5616562615206084ef4947a"
+    },
+    "phase4_pr": {
+      "status": "NOT_CREATED_API_FORBIDDEN",
+      "attempt": "gh pr create --base feature/m3a-ibkr-tsm-readiness --head feature/phase4a-tsm-native-research-adapter --body-file docs/PHASE4A_PR.md",
+      "error": "Post https://api.github.com/graphql: Forbidden"
+    },
     "base_dependency": "PR3 feature/m3a-ibkr-tsm-readiness",
     "phase3_branch_modified": false
   },
@@ -99,5 +111,7 @@
     "Explicit Holdout boundaries and compatible row-group isolation",
     "Existing SEC and FINRA TAF effective-rate records",
     "GitHub PR API access"
-  ]
+  ],
+  "core_implementation_commit_sha": "07c13e4820a0550be5616562615206084ef4947a",
+  "delivery_commit_note": "This pins final implementation code; later documentation-only closure may differ. Native provenance/core_code_identity resolves exact installed checkout SHA."
 }

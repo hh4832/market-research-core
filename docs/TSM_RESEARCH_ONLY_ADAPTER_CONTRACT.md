@@ -247,3 +247,17 @@ A prepared PR body and explicit Phase3 dependency are included with delivery.
 
 Monetary disclosure values are Decimal; serialize them as decimal strings (for
 example `json.dumps(disclosure, default=str)`), preserving precision.
+
+## Closure evidence
+
+Final implementation code SHA: `07c13e4820a0550be5616562615206084ef4947a`.
+[GitHub CI42142215511](https://github.com/hh4832/market-research-core/actions/runs/42142215511)
+passed both Python3.11 and3.12 jobs. Full local regressions each98 PASS, zero
+failed/skipped. This closure only updates documentation/diagnostics; runtime
+`core_code_identity()` reports the exact delivery checkout SHA.
+
+Phase4 branch push succeeded. Actual `gh pr create` failed with
+`Post https://api.github.com/graphql: Forbidden`; no Phase4 PR was created by
+this session. Prepared body: `docs/PHASE4A_PR.md`. Target base is the Phase3
+feature branch until dependency PR #3 merges. No source/fee evidence arrived,
+so real bounded conversion remains PENDING and verdict stays SCOPED_GO.
