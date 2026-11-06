@@ -176,3 +176,11 @@ outside the immutable Snapshot. It verifies the pinned manifest/lineage/schema
 and ALL daily footer boundaries before hashing the development-only file. It
 never opens the parent source, never rewrites the Snapshot, and then requires the
 normal preflight again. This is not permission to hash the original mixed file.
+
+Reviewed producer/reader implementation pin:
+`b16179a7cc077c36046574769a32c367fa476cae`; Agent proposal/probe pin:
+`9e368f8925a425f7dae8921291c168b5d197f33a`. The cleared-output notebook installs
+these immutable revisions, not a moving branch. Later notebook/evidence commits
+do not change those installed implementations. Local Core regression:106 PASS
+on each Python3.11/3.12 (including7 synthetic producer tests and notebook static
+safety/syntax validation). Synthetic proof is not actual Drive preflight.

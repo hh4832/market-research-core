@@ -22,20 +22,31 @@
   "formal_gates": "UNCHANGED",
   "code_regression": {
     "python3.11": {
-      "passed": 104,
+      "passed": 106,
       "failed": 0,
       "skipped": 0
     },
     "python3.12": {
-      "passed": 104,
+      "passed": 106,
       "failed": 0,
       "skipped": 0
     },
-    "synthetic_producer_cases": 6,
-    "real_data_acceptance_claimed": false
+    "synthetic_producer_cases": 7,
+    "real_data_acceptance_claimed": false,
+    "notebook_static_checks": 1
   },
-  "core_implementation_sha": null,
-  "github_ci": "PENDING_PUSH",
+  "core_implementation_sha": "b16179a7cc077c36046574769a32c367fa476cae",
+  "github_ci": {
+    "core_implementation": {
+      "url": "https://github.com/hh4832/market-research-core/actions/runs/42198298813",
+      "status": "PASS",
+      "python": [
+        "3.11",
+        "3.12"
+      ]
+    },
+    "agent_implementation": "PENDING_FINAL_CI_OBSERVATION"
+  },
   "required_human_approvals": [
     {
       "condition": "ONLY_IF_NO_USABLE_ISOLATED_SOURCE",
@@ -45,5 +56,8 @@
       "condition": "AFTER_REAL_DERIVED_BUNDLE_AND_PREFLIGHT_EXIST",
       "approval": "New research authorization pinning derived identity; old SMOKE-0001 cannot be reused"
     }
-  ]
+  ],
+  "agent_implementation_sha": "9e368f8925a425f7dae8921291c168b5d197f33a",
+  "colab_notebook": "notebooks/TSM_Development_Snapshot_Preparation.ipynb",
+  "colab_executed_in_this_session": false
 }
