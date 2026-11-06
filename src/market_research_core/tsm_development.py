@@ -270,6 +270,42 @@ def inventory_isolated_sources(roots: list[str], *, parent_manifest_path: str, p
             'source_identity':'CALLER_DECLARED_TSM_ROOTS; NOT_INFERRED_FROM_OHLCV'}
 
 
+def renew_development_receipt(bundle: dict) -> dict:
+    """Portable proof renewal ONLY for an already pinned development-only file.
+
+    Validate manifest/lineage and ALL footer dates before any file-body checksum.
+    No original/source file is opened. Return a new binding; never rewrite snapshot.
+    """
+    import copy
+    from .tsm_native import _inside
+    root=Path(bundle['snapshot_root']).resolve(strict=True)
+    pin=DevelopmentSnapshotPin(**bundle['snapshot_pin'])
+    if root.name!=pin.snapshot_id:refuse('DERIVED_ID','wrong development root')
+    mp=_inside(root,bundle['manifest_relative_path'])
+    if file_sha(mp)!=bundle['manifest_sha256']:refuse('SNAPSHOT_SHA_MISMATCH','manifest changed')
+    doc=json.loads(mp.read_text())
+    validate_derived_manifest(root,doc,pin,WINDOW,(HOLDOUT,))
+    if doc.get('snapshot_id')!=pin.snapshot_id or doc.get('producer_sha')!=pin.producer_sha:
+        refuse('DERIVED_PIN','manifest identity mismatch')
+    data=_inside(root,doc['parquet_path']);pf=pq.ParquetFile(data)
+    if {f.name:str(f.type) for f in pf.schema_arrow}!=doc['arrow_schema']:
+        refuse('SCHEMA_MISMATCH','development schema changed')
+    idx=pf.schema.names.index(doc['columns']['timestamp'])
+    for i in range(pf.num_row_groups):
+        st=pf.metadata.row_group(i).column(idx).statistics
+        if not st or not st.has_min_max:refuse('DERIVED_ROW_GROUP','cannot establish development-only bytes')
+        a,b=pd.Timestamp(st.min),pd.Timestamp(st.max)
+        if a.tzinfo is None or b.tzinfo is None:refuse('DERIVED_ROW_GROUP','naive timestamp stats')
+        w=DateWindow(a.tz_convert('America/New_York').date().isoformat(),b.tz_convert('America/New_York').date().isoformat())
+        if w.start!=w.end or not WINDOW.contains(w) or w.overlaps(HOLDOUT):
+            refuse('DERIVED_ROW_GROUP','receipt renewal must never hash a holdout-containing file')
+    receipt=verify_file_bytes(data,expected_sha256=doc['parquet_sha256'],manifest_sha256=bundle['manifest_sha256'],
+              verification_ref='DEVELOPMENT_RECEIPT_RENEWAL:'+bundle['integrity_receipt_sha256'],allow_full_file_hash=True)
+    result=copy.deepcopy(bundle)
+    result.update(integrity_receipt=asdict(receipt),integrity_receipt_sha256=receipt.sha256)
+    return result
+
+
 def main(argv=None):
     import argparse
     ap=argparse.ArgumentParser(description=__doc__)

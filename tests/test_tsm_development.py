@@ -123,3 +123,16 @@ def test_derived_non_candidate_holdout_group_cannot_hide_behind_manifest_claim(t
                         verification_ref='SYNTHETIC_FORGED_ARTIFACT_TEST',allow_full_file_hash=True)
     b['integrity_receipt']=asdict(r);b['integrity_receipt_sha256']=r.sha256
     with pytest.raises(NativeSnapshotRejected,match='DERIVED_ROW_GROUP'):preflight_development_snapshot(b)
+
+
+def test_receipt_renewal_for_moved_development_data_is_independent_and_nonmutating(tmp_path):
+    import shutil
+    from market_research_core.tsm_development import renew_development_receipt
+    _,_,plan=inputs(tmp_path);b=produce_development_snapshot(plan,tmp_path/'out',producer_sha='a'*40)
+    moved=tmp_path/'new_mount'/Path(b['snapshot_root']).name;shutil.copytree(b['snapshot_root'],moved)
+    moved_bundle={**b,'snapshot_root':str(moved)}
+    before={p.name:file_sha(p) for p in moved.iterdir() if p.is_file()}
+    with pytest.raises(NativeSnapshotRejected,match='SNAPSHOT_SHA_MISMATCH'):preflight_development_snapshot(moved_bundle)
+    renewed=renew_development_receipt(moved_bundle)
+    assert preflight_development_snapshot(renewed)['status']=='PASS'
+    assert before=={p.name:file_sha(p) for p in moved.iterdir() if p.is_file()}

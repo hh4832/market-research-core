@@ -169,3 +169,10 @@ This is one bounded producer preparation, not a new full-history validation
 phase. Only two human approvals can remain: conditional mixed producer conversion
 if isolated source is unavailable, and the new research authorization after its
 actual Snapshot pins exist. Neither is signed or consumed by Codex.
+
+Receipt portability: after copying an existing derived Snapshot to another
+machine, call `renew_development_receipt(bundle)` and save its returned binding
+outside the immutable Snapshot. It verifies the pinned manifest/lineage/schema
+and ALL daily footer boundaries before hashing the development-only file. It
+never opens the parent source, never rewrites the Snapshot, and then requires the
+normal preflight again. This is not permission to hash the original mixed file.
