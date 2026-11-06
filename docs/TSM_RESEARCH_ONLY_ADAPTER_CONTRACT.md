@@ -261,3 +261,10 @@ Phase4 branch push succeeded. Actual `gh pr create` failed with
 this session. Prepared body: `docs/PHASE4A_PR.md`. Target base is the Phase3
 feature branch until dependency PR #3 merges. No source/fee evidence arrived,
 so real bounded conversion remains PENDING and verdict stays SCOPED_GO.
+
+## v1.1 development-only repair
+
+[Development Snapshot Contract](TSM_DEVELOPMENT_SNAPSHOT_CONTRACT.md) documents the
+explicit derived pin, immutable daily-row-group producer and independent receipts.
+The original v1.0 reader and original Snapshot guards remain in force by default.
+No actual mixed source is converted without personally signed producer permission.

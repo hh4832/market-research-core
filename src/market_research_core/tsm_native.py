@@ -159,7 +159,7 @@ def load_native_tsm(snapshot_path: str | Path, *, manifest_relative_path: str,
                     expected_manifest_sha256: str, layout: ManifestLayout,
                     integrity_receipt: FileIntegrityReceipt, expected_receipt_sha256: str,
                     symbol: str, dates: DateWindow, research_window: DateWindow,
-                    holdout: tuple[DateWindow, ...], max_rows: int = 100_000) -> NativeTSMResult:
+                    holdout: tuple[DateWindow, ...], max_rows: int = 100_000, snapshot_pin=None) -> NativeTSMResult:
     """Read at most 31 requested dates, with mandatory allowed/holdout boundaries.
 
     Rows returned and materialized are predicate-bounded. Candidate row groups
@@ -177,7 +177,13 @@ def load_native_tsm(snapshot_path: str | Path, *, manifest_relative_path: str,
     if CONSERVATIVE_POLICY.sha256 != POLICY_SHA:
         _reject('POLICY_SHA_MISMATCH', 'approved policy pin changed')
     root = Path(snapshot_path).resolve(strict=True)
-    if root.name != PINNED_SNAPSHOT.run_name:
+    if snapshot_pin is not None:
+        from .tsm_development import DevelopmentSnapshotPin
+        if not isinstance(snapshot_pin,DevelopmentSnapshotPin):
+            _reject('DERIVED_PIN','explicit reviewed development snapshot pin required')
+    expected_id = snapshot_pin.snapshot_id if snapshot_pin is not None else PINNED_SNAPSHOT.run_name
+    expected_producer = snapshot_pin.producer_sha if snapshot_pin is not None else PINNED_SNAPSHOT.producer_git_sha
+    if root.name != expected_id:
         _reject('SNAPSHOT_ID_MISMATCH', 'root is not pinned snapshot')
     manifest_path = _inside(root, manifest_relative_path)
     manifest_bytes = manifest_path.read_bytes()
@@ -186,8 +192,11 @@ def load_native_tsm(snapshot_path: str | Path, *, manifest_relative_path: str,
         _reject('SNAPSHOT_SHA_MISMATCH', 'manifest SHA mismatch')
     doc = json.loads(manifest_bytes)
     values = {k: _pointer(doc, p) for k,p in asdict(layout).items()}
-    if (values['snapshot_id'], values['producer_sha'], values['symbol']) != (PINNED_SNAPSHOT.run_name, PINNED_SNAPSHOT.producer_git_sha, 'TSM'):
+    if (values['snapshot_id'], values['producer_sha'], values['symbol']) != (expected_id, expected_producer, 'TSM'):
         _reject('SNAPSHOT_ID_MISMATCH', 'manifest identity/producer/symbol mismatch')
+    if snapshot_pin is not None:
+        from .tsm_development import validate_derived_manifest
+        validate_derived_manifest(root,doc,snapshot_pin,dates,holdout)
     path = _inside(root, values['parquet_path'])
     file_sha = _pin(values['parquet_sha256'])
     receipt = integrity_receipt
@@ -218,8 +227,14 @@ def load_native_tsm(snapshot_path: str | Path, *, manifest_relative_path: str,
         first,last = pd.Timestamp(stats.min),pd.Timestamp(stats.max)
         if first.tzinfo is None or last.tzinfo is None:
             _reject('ROW_GROUP_BOUNDARY_UNKNOWN', 'timezone-aware statistics required')
+        if snapshot_pin is not None:
+            physical=DateWindow(first.tz_convert('America/New_York').date().isoformat(),last.tz_convert('America/New_York').date().isoformat())
+            if physical.start!=physical.end or not DateWindow(snapshot_pin.start,snapshot_pin.end).contains(physical) or any(physical.overlaps(h) for h in holdout):
+                _reject('DERIVED_ROW_GROUP','every derived group must be a single permitted development day, even outside query')
         if last >= lo and first < hi:
             group_window = DateWindow(first.tz_convert('America/New_York').date().isoformat(),last.tz_convert('America/New_York').date().isoformat())
+            if snapshot_pin is not None and group_window.start!=group_window.end:
+                _reject('DERIVED_ROW_GROUP','derived group crosses New York dates')
             if not research_window.contains(group_window) or any(group_window.overlaps(h) for h in holdout):
                 _reject('HOLDOUT_ROW_GROUP_OVERLAP', 'candidate row group crosses authorization or holdout; use isolated existing partitions')
     predicate = ((ds.field(ts_name) >= pa.scalar(lo.to_pydatetime(),type=ts_type)) &
@@ -239,7 +254,7 @@ def load_native_tsm(snapshot_path: str | Path, *, manifest_relative_path: str,
     converted = prepare_conservative_bars(source,bar_minutes=15)
     if stamp != _stamp(path) or manifest_bytes != manifest_path.read_bytes():
         _reject('SOURCE_CHANGED', 'source or manifest changed during bounded read')
-    provenance = dict(snapshot_id=PINNED_SNAPSHOT.run_name,producer_sha=PINNED_SNAPSHOT.producer_git_sha,
+    provenance = dict(snapshot_id=expected_id,producer_sha=expected_producer,
                       manifest_relative_path=manifest_relative_path,manifest_sha256=manifest_sha,
                       parquet_relative_path=values['parquet_path'],parquet_sha256=file_sha,
                       integrity_receipt_sha256=receipt.sha256,integrity_verification_ref=receipt.verification_ref,
@@ -249,4 +264,7 @@ def load_native_tsm(snapshot_path: str | Path, *, manifest_relative_path: str,
                       native_rows=count,conservative_buckets=len(converted),policy_id=CONSERVATIVE_POLICY.policy_id,
                       policy_version=CONSERVATIVE_POLICY.version,policy_sha256=POLICY_SHA,scope='RESEARCH_ONLY',
                       source_timestamp_label='UNKNOWN',formal_execution_eligible=False,**core_code_identity())
+    if snapshot_pin is not None:
+        provenance['derived_snapshot_pin']=asdict(snapshot_pin)
+        provenance['source_snapshot_id']=PINNED_SNAPSHOT.run_name
     return NativeTSMResult(native,source,converted,provenance)

@@ -1,0 +1,49 @@
+{
+  "contract": "tsm-development-preparation-v1.1",
+  "verdict": "SCOPED_GO_ENGINEERING_REAL_DATA_PENDING",
+  "base_core_sha": "e31c57b6c9dd599d808516ce6664628bdc79319e",
+  "base_agent_sha": "4c1c70ae221c07ed65bd01b4f1127fa1f3dc4a52",
+  "actual_source_inventory": "NOT_CONFIRMED_DRIVE_NOT_ATTACHED; NO_CLAIM_THAT_CHUNKS_DO_NOT_EXIST",
+  "observed_probe_sha256": "0f42cd93e12c44aa22a25da13b0a98ad0d4b03084c8bb9eab73a03b381a40e8e",
+  "original_blockers": {
+    "MANIFEST_LAYOUT": "ORIGINAL_UNCHANGED; V1.1_DERIVED_CONTRACT_IMPLEMENTED",
+    "HOLDOUT_ROW_GROUP_OVERLAP": "ORIGINAL_GUARD_PRESERVED; DAILY_DERIVED_PRODUCER_IMPLEMENTED",
+    "INTEGRITY_RECEIPT": "ORIGINAL_UNVERIFIED; INDEPENDENT_DERIVED_HASH_RECEIPT_IMPLEMENTED"
+  },
+  "actual_development_snapshot_created": false,
+  "actual_development_manifest": null,
+  "actual_development_receipt": null,
+  "actual_preflight": "NOT_RUN_NO_SAFE_SOURCE_ACCESS_OR_SIGNED_MIXED_PLAN",
+  "actual_holdout_ohlcv_read": false,
+  "actual_source_full_hash_performed": false,
+  "actual_strategy_run": false,
+  "batch_used_before": 0,
+  "batch_used_after": 0,
+  "formal_gates": "UNCHANGED",
+  "code_regression": {
+    "python3.11": {
+      "passed": 104,
+      "failed": 0,
+      "skipped": 0
+    },
+    "python3.12": {
+      "passed": 104,
+      "failed": 0,
+      "skipped": 0
+    },
+    "synthetic_producer_cases": 6,
+    "real_data_acceptance_claimed": false
+  },
+  "core_implementation_sha": null,
+  "github_ci": "PENDING_PUSH",
+  "required_human_approvals": [
+    {
+      "condition": "ONLY_IF_NO_USABLE_ISOLATED_SOURCE",
+      "approval": "Personally signed exact producer plan permitting full29363599-byte opaque hash and mixed row-group1 decoding, conversion only"
+    },
+    {
+      "condition": "AFTER_REAL_DERIVED_BUNDLE_AND_PREFLIGHT_EXIST",
+      "approval": "New research authorization pinning derived identity; old SMOKE-0001 cannot be reused"
+    }
+  ]
+}
