@@ -1,5 +1,9 @@
 # Development Snapshot Contract v1.2
 
+For receipt stat failures on existing Drive outputs, use the
+[local recovery procedure](TSM_DEVELOPMENT_RECOVERY.md). It preserves original
+failed snapshots and never reruns conversion.
+
 This is a bounded extension of v1.1, not a database rebuild or data-quality audit.
 Only `tsm_development.py`, direct regression tests, this contract and the new
 long-window preparation notebook change. Engine, costs, strategies, PIT policy,

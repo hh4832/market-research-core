@@ -260,3 +260,143 @@ def test_v12_lineage_cannot_hide_approved_holdout_exposure(tmp_path,field,value)
     m=json.loads(mp.read_text());m['lineage_sha256']=file_sha(lp);mp.write_text(json.dumps(m))
     b['snapshot_pin']['lineage_sha256']=file_sha(lp);b['manifest_sha256']=file_sha(mp)
     with pytest.raises(NativeSnapshotRejected,match='DERIVED_LINEAGE'):preflight_development_snapshot(b)
+
+
+# Receipt recovery is a data-only procedure; the raw conversion inputs are removed below.
+def failed_long_output(tmp_path,monkeypatch,stat_field='ctime_ns',producer_sha='a'*40):
+    import market_research_core.tsm_development as dev
+    source,_,plan=long_inputs(tmp_path)
+    approval=synthetic_approval(plan)
+    monkeypatch.setattr(dev,'core_code_identity',lambda:{'core_git_sha':producer_sha,'core_tree_dirty':False})
+    real_preflight=dev.preflight_development_snapshot
+    def stale_drive_receipt(bundle):
+        # Emulate just one FUSE stat field changing after receipt issuance, with valid byte hashes.
+        bundle['integrity_receipt']['stat'][stat_field]-=1
+        receipt=FileIntegrityReceipt(**bundle['integrity_receipt'])
+        bundle['integrity_receipt_sha256']=receipt.sha256
+        (Path(bundle['snapshot_root'])/'binding.json').write_text(json.dumps(bundle))
+        return real_preflight(bundle)
+    monkeypatch.setattr(dev,'preflight_development_snapshot',stale_drive_receipt)
+    with pytest.raises(NativeSnapshotRejected,match='receipt does not bind unchanged file'):
+        produce_development_snapshot(plan,tmp_path/'failed',producer_sha=producer_sha,approval=approval)
+    monkeypatch.setattr(dev,'preflight_development_snapshot',real_preflight)
+    root=next((tmp_path/'failed').iterdir())
+    bundle=json.loads((root/'binding.json').read_text())
+    assert (root/'FAILED.json').is_file()
+    # Recovery must succeed with the original mixed Parquet and parent manifest unavailable.
+    import shutil
+    shutil.rmtree(source.parent)
+    def forbidden(*args,**kwargs):raise AssertionError('Recovery invoked original conversion')
+    for name in ('plan_conversion','produce_development_snapshot','_validate_plan'):
+        monkeypatch.setattr(dev,name,forbidden)
+    import market_research_core.tsm_recovery as recovery
+    monkeypatch.setattr(recovery,'core_code_identity',lambda:{'core_git_sha':'b'*40,'core_tree_dirty':False})
+    kwargs=dict(expected_plan_sha256=plan['plan_sha256'],expected_producer_sha=producer_sha,
+                conversion_approval=approval,recovery_sha='b'*40)
+    return bundle,kwargs
+
+
+@pytest.mark.parametrize('field',['inode','ctime_ns','mtime_ns'])
+def test_recovery_stale_drive_stat_preserves_bytes_failure_and_original_receipt(tmp_path,monkeypatch,field):
+    from market_research_core.tsm_recovery import recover_development_snapshot
+    b,kwargs=failed_long_output(tmp_path,monkeypatch,field)
+    root=Path(b['snapshot_root']);before={p.name:file_sha(p) for p in root.iterdir()}
+    with pytest.raises(NativeSnapshotRejected,match='SNAPSHOT_SHA_MISMATCH'):preflight_development_snapshot(b)
+    result=recover_development_snapshot(b,tmp_path/'local',tmp_path/'archive',**kwargs)
+    assert preflight_development_snapshot(result['local_binding'])['status']=='PASS'
+    assert result['local_preflight']['native_rows']==4
+    assert before=={p.name:file_sha(p) for p in root.iterdir()}
+    archive=Path(result['archive_directory']);archived=archive/root.name
+    assert before=={p.name:file_sha(p) for p in archived.iterdir()}
+    record=result['recovery_provenance']
+    assert record['original_stat_differences']==[field]
+    assert record['original_failure_sha256']==before['FAILED.json']
+    assert record['original_producer_sha']=='a'*40 and record['recovery_core_sha']=='b'*40
+    assert record['conversion_approval']==kwargs['conversion_approval']
+    assert record['output_holdout_rows']==0 and record['conversion_performed'] is False
+    assert record['original_source_opened'] is False
+    assert (archive/'RECOVERY_VERIFIED.json').is_file()
+    assert record['receipt_portability']=='LOCAL_ONLY_RESTAGE_AND_RENEW_ON_NEW_MOUNT'
+    # The archived local receipt is NOT falsely considered portable to Drive/new mounts.
+    with pytest.raises(NativeSnapshotRejected,match='SNAPSHOT_SHA_MISMATCH'):
+        preflight_development_snapshot({**result['local_binding'],'snapshot_root':str(archived)})
+
+
+@pytest.mark.parametrize('artifact',['manifest.json','lineage.json','tsm_development_1m.parquet'])
+def test_recovery_rejects_wrong_manifest_lineage_and_parquet_sha(tmp_path,monkeypatch,artifact):
+    from market_research_core.tsm_recovery import recover_development_snapshot
+    b,kwargs=failed_long_output(tmp_path,monkeypatch)
+    root=Path(b['snapshot_root']);path=root/artifact
+    if artifact.endswith('.parquet'):
+        # Valid daily Parquet and timestamps, but wrong OHLCV bytes must fail independent SHA.
+        table=pq.read_table(path)
+        idx=table.schema.get_field_index('volume')
+        table=table.set_column(idx,'volume',pa.array([99.0]*table.num_rows))
+        days=table['timestamp_utc'].to_pandas().dt.tz_convert('America/New_York').dt.date
+        with pq.ParquetWriter(path,table.schema) as writer:
+            for day in sorted(set(days)):writer.write_table(table.filter(pa.array((days==day).to_numpy())))
+    else:
+        with path.open('a') as stream:stream.write(' ')
+    with pytest.raises(NativeSnapshotRejected,match='SNAPSHOT_SHA_MISMATCH|DERIVED_LINEAGE'):
+        recover_development_snapshot(b,tmp_path/'local',tmp_path/'archive',**kwargs)
+    assert not (tmp_path/'archive').exists()
+
+
+def test_recovery_rejects_holdout_before_parquet_copy_or_hash(tmp_path,monkeypatch):
+    from market_research_core.tsm_recovery import recover_development_snapshot
+    import market_research_core.tsm_development as dev
+    b,kwargs=failed_long_output(tmp_path,monkeypatch)
+    root=Path(b['snapshot_root']);mp=root/'manifest.json';m=json.loads(mp.read_text());data=root/m['parquet_path']
+    original=pq.read_table(data);row=original.slice(0,1).to_pylist()[0]
+    row['timestamp_utc']=pd.Timestamp('2025-01-01T05:00Z').to_pydatetime()
+    extra=pa.Table.from_pylist([row],schema=original.schema)
+    with pq.ParquetWriter(data,original.schema) as writer:
+        writer.write_table(original.slice(0,1));writer.write_table(original.slice(1,1))
+        writer.write_table(original.slice(2));writer.write_table(extra)
+    # Re-pinning a synthetic malicious artifact must not bypass daily Holdout guards.
+    m['parquet_sha256']=file_sha(data);mp.write_text(json.dumps(m));b['manifest_sha256']=file_sha(mp)
+    original_hash=dev.file_sha
+    def no_data_hash(path):
+        assert Path(path)!=data,'Holdout body hashed before boundary rejection'
+        return original_hash(path)
+    monkeypatch.setattr(dev,'file_sha',no_data_hash)
+    with pytest.raises(NativeSnapshotRejected,match='DERIVED_ROW_GROUP'):
+        recover_development_snapshot(b,tmp_path/'local',tmp_path/'archive',**kwargs)
+    assert not (tmp_path/'local').exists() and not (tmp_path/'archive').exists()
+
+
+@pytest.mark.parametrize('destination',['local','archive'])
+def test_recovery_never_overwrites_existing_destination(tmp_path,monkeypatch,destination):
+    from market_research_core.tsm_recovery import recover_development_snapshot
+    b,kwargs=failed_long_output(tmp_path,monkeypatch)
+    target=tmp_path/destination;target.mkdir();(target/'sentinel').write_text('UNCHANGED')
+    with pytest.raises(FileExistsError):recover_development_snapshot(b,tmp_path/'local',tmp_path/'archive',**kwargs)
+    assert (target/'sentinel').read_text()=='UNCHANGED'
+
+
+@pytest.mark.parametrize('mismatch',['plan','producer','approval','receipt','recovery_commit'])
+def test_recovery_requires_this_snapshot_original_pins_and_evidence(tmp_path,monkeypatch,mismatch):
+    from market_research_core.tsm_recovery import recover_development_snapshot
+    b,kwargs=failed_long_output(tmp_path,monkeypatch,producer_sha='c'*40)
+    if mismatch=='plan':kwargs['expected_plan_sha256']='0'*64
+    if mismatch=='producer':kwargs['expected_producer_sha']='a'*40
+    if mismatch=='approval':kwargs['conversion_approval']={**kwargs['conversion_approval'],'approval_ref':'https://example.test/OTHER_APPROVAL'}
+    if mismatch=='receipt':b['integrity_receipt_sha256']='0'*64
+    if mismatch=='recovery_commit':kwargs['recovery_sha']='d'*40
+    with pytest.raises(NativeSnapshotRejected,match='RECOVERY_|INTEGRITY_RECEIPT'):
+        recover_development_snapshot(b,tmp_path/'local',tmp_path/'archive',**kwargs)
+    assert not (tmp_path/'local').exists() and not (tmp_path/'archive').exists()
+
+
+def test_recovery_archive_corruption_never_gets_success_marker(tmp_path,monkeypatch):
+    import market_research_core.tsm_recovery as recovery
+    b,kwargs=failed_long_output(tmp_path,monkeypatch)
+    original_hash=recovery.file_sha
+    archive=tmp_path/'archive'
+    def bad_readback(path):
+        if Path(path).is_relative_to(archive) and str(path).endswith('.parquet'):return '0'*64
+        return original_hash(path)
+    monkeypatch.setattr(recovery,'file_sha',bad_readback)
+    with pytest.raises(NativeSnapshotRejected,match='RECOVERY_ARCHIVE_SHA'):
+        recovery.recover_development_snapshot(b,tmp_path/'local',archive,**kwargs)
+    assert archive.exists() and not (archive/'RECOVERY_VERIFIED.json').exists()

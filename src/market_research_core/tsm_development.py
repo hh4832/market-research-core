@@ -380,6 +380,20 @@ def renew_development_receipt(bundle: dict) -> dict:
     No original/source file is opened. Return a new binding; never rewrite snapshot.
     """
     import copy
+    doc,data=_development_file(bundle)
+    receipt=verify_file_bytes(data,expected_sha256=doc['parquet_sha256'],manifest_sha256=bundle['manifest_sha256'],
+              verification_ref='DEVELOPMENT_RECEIPT_RENEWAL:'+bundle['integrity_receipt_sha256'],allow_full_file_hash=True)
+    result=copy.deepcopy(bundle)
+    result.update(integrity_receipt=asdict(receipt),integrity_receipt_sha256=receipt.sha256)
+    return result
+
+
+def _development_file(bundle):
+    """Validate pinned metadata and ALL development-only footers, without hashing data.
+
+    Shared by renewal and recovery so even an alleged development file containing
+    Holdout is refused before copying or hashing its record bytes.
+    """
     from .tsm_native import _inside
     root=Path(bundle['snapshot_root']).resolve(strict=True)
     pin=DevelopmentSnapshotPin(**bundle['snapshot_pin'])
@@ -402,11 +416,7 @@ def renew_development_receipt(bundle: dict) -> dict:
         w=DateWindow(a.tz_convert('America/New_York').date().isoformat(),b.tz_convert('America/New_York').date().isoformat())
         if w.start!=w.end or not pin.window.contains(w) or w.overlaps(HOLDOUT):
             refuse('DERIVED_ROW_GROUP','receipt renewal must never hash a holdout-containing file')
-    receipt=verify_file_bytes(data,expected_sha256=doc['parquet_sha256'],manifest_sha256=bundle['manifest_sha256'],
-              verification_ref='DEVELOPMENT_RECEIPT_RENEWAL:'+bundle['integrity_receipt_sha256'],allow_full_file_hash=True)
-    result=copy.deepcopy(bundle)
-    result.update(integrity_receipt=asdict(receipt),integrity_receipt_sha256=receipt.sha256)
-    return result
+    return doc,data
 
 
 def main(argv=None):
