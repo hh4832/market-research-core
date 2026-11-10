@@ -1,4 +1,94 @@
-# Development-only TSM snapshot contract v1.1
+# Development Snapshot Contract v1.2
+
+This is a bounded extension of v1.1, not a database rebuild or data-quality audit.
+Only `tsm_development.py`, direct regression tests, this contract and the new
+long-window preparation notebook change. Engine, costs, strategies, PIT policy,
+formal gates, authorization/budget logs and existing snapshots are untouched.
+
+## Allow-list and compatibility
+
+| Identity key | Inclusive New York dates | Manifest contract | Snapshot prefix |
+| --- | --- | --- | --- |
+| `20240529_20240628` | 2024-05-29–2024-06-28 | `tsm-development-snapshot-v1.1` | `TSM_DEV_1M_20240529_20240628_` |
+| `20161019_20241231` | 2016-10-19–2024-12-31 | `tsm-development-snapshot-v1.2` | `TSM_DEV_1M_20161019_20241231_` |
+
+No other preparation dates are accepted. `WINDOW` and omitted pin dates retain
+the v1.1 meaning. Long pins must explicitly set start/end; changing only a prefix
+cannot reinterpret a v1.1 pin. Old plan canonical bytes and suffix derivation stay
+compatible: suffix = first 20 hex of SHA256(canonical JSON
+`{"plan": plan_sha256, "producer": producer_sha}`). JSON uses sorted keys, compact
+separators and rejects NaN. Producer SHA is the full clean installed Core commit.
+
+For v1.2, plan, manifest and lineage all carry identical `window_identity`:
+key `20161019_20241231`, timezone `America/New_York`, filter_start
+`2016-10-19T00:00:00`, filter_end_exclusive `2025-01-01T00:00:00`, and
+holdout_start `2025-01-01`. All three declare `output_holdout_rows == 0`.
+The new plan/lineage contracts are respectively
+`tsm-producer-conversion-plan-v1.2` and `tsm-development-lineage-v1.2`.
+Plan body digest, source identity/hash, decoded group indices, risk flags and
+approval evidence are checked from pinned lineage without reopening raw sources.
+The manifest pins lineage bytes; binding pins manifest, receipt and snapshot pin.
+
+Use `plan_conversion(..., window=LONG_WINDOW)` or CLI
+`plan --window 20161019_20241231`. This window requires exactly the existing Final
+Gate `tsm_normalized.parquet` beside its pinned parent manifest, with the expected
+source SHA equal to its TSM published claim. Production independently verifies
+that claim; a wrong source SHA stops before decoding. No arbitrary sources/dates
+are enabled for the new window.
+
+## Holdout safety and acceptance evidence
+
+| Operation | Holdout exposure | Gate / evidence |
+| --- | --- | --- |
+| Planning | Parent manifest and Parquet footer only; no source body hashing or record decoding | Exact canonical plan SHA, source stat/schema, compressed extents and selected groups |
+| Source SHA256 | Full source bytes, including Holdout bytes | Personal exact-plan approval before hashing |
+| Selected group decoding | Known original group 1 mixes Development and Holdout records | Same approval before decoding; honest `holdout_decode_occurred` retained |
+| Development output | Only `[2016-10-19 00:00, 2025-01-01 00:00)` in New York | Filter, round-trip equality, all daily footer checks, zero output Holdout rows |
+| Reader / runner | Only explicit development pin and safe daily groups; no raw source supplied | Existing bounded reader protections; no research authorization granted |
+| Receipt renewal | Only pinned development output | Validates manifest/lineage/all daily footers before hashing; raw source never opened |
+
+Zero output Holdout rows does **not** mean no Holdout decoding. Planning treats
+all timestamps from 2025-01-01 onward as Holdout exposure, including any source
+dates beyond the historical lock end. Missing approval, mismatched SHA or changed
+physical plan fails closed before source hashing, decoding or output creation.
+Approval is a human attestation artifact, not a cryptographic identity service;
+Codex must never supply it for real conversion. Conversion permission grants no
+strategy access or research authorization.
+
+Long preflight batches only populated dates into queries spanning at most 31
+calendar days. Every native call keeps its existing 100000-row limit and checks
+ALL daily groups. Counts are aggregated and compared with the manifest; verified
+query windows are reported. No native-reader limit or backtest behavior changes.
+
+Synthetic CI tests cover both contracts, arbitrary-date rejection, New York
+midnight exclusion (including later source dates), exact identity consistency,
+wrong source hash, missing/mismatched approval, daily groups, lineage and receipt
+renewal without the original source. Existing Core regressions remain required.
+These tests are engineering evidence, never real Holdout/data acceptance.
+
+## Colab delivery and stop condition
+
+Use [long-window preparation notebook](../notebooks/TSM_Long_Development_Snapshot_Preparation.ipynb)
+on GitHub, or its Open in Colab link. It clones a fixed reviewed Core commit,
+installs only existing declared dependencies, mounts Drive, verifies parent
+manifest/source lineage, prints/saves the exact footer-only plan and hashing /
+decoding risks, then waits for the lead to personally enter evidence and
+`APPROVE <exact SHA>`. Empty input raises before conversion. There is no default
+approved SHA and no Agent installation or authorization proposal. It writes new
+snapshot/report directories exclusively to Drive, verifies binding/manifest/
+lineage/receipt/preflight, and stops. Existing v1.1 notebook is historical and
+remains pinned to its original implementation; it does not prepare v1.2.
+
+Real conversion is intentionally NOT run during development. Generating the real
+long snapshot still requires Drive access, actual footer plan, personal approval
+of that exact plan, and successful production/preflight. No approval is inherited
+from a v1.1 plan. No Holdout backtest, metrics or OHLCV export is permitted.
+
+---
+
+## Historical v1.1 documentation (original scope and evidence)
+
+### Development-only TSM snapshot contract v1.1
 
 Continue Core PR #4 / Agent PR #5; no replacement PR, no merge or reset. The
 original Snapshot, manifest, Holdout lock, SMOKE-0001 authorization/use log,

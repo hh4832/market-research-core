@@ -136,3 +136,101 @@ def test_receipt_renewal_for_moved_development_data_is_independent_and_nonmutati
     renewed=renew_development_receipt(moved_bundle)
     assert preflight_development_snapshot(renewed)['status']=='PASS'
     assert before=={p.name:file_sha(p) for p in moved.iterdir() if p.is_file()}
+
+
+# Fixed long-window fixtures contain only synthetic timestamps and prices.
+def long_inputs(tmp_path):
+    from market_research_core.tsm_development import LONG_WINDOW
+    path,table,old_plan=inputs(tmp_path,True)
+    times=[pd.Timestamp(t) for t in ('2016-10-18T16:00Z','2016-10-19T13:45Z',
+           '2016-11-21T14:45Z','2024-12-31T23:59Z','2025-01-01T04:59Z','2025-01-01T05:00Z',
+           '2027-01-01T05:00Z')]
+    table=pa.table({'timestamp_utc':pa.array(times,type=pa.timestamp('us','UTC')),
+                   **{k:pa.array([1000.0 if k=='volume' else 100.0]*len(times)) for k in ('open','high','low','close','volume')}})
+    path.unlink();path=path.parent/'tsm_normalized.parquet'
+    pq.write_table(table,path,row_group_size=len(times))
+    mp=path.parent/'final_gate_manifest.json'
+    mp.write_text(json.dumps({'results':[{'symbol':'TSM','published_sha256':file_sha(path)}]}))
+    plan=plan_conversion([{'path':str(path),'expected_sha256':file_sha(path),'lineage_ref':'SYNTHETIC_ONLY'}],
+                         parent_manifest_path=mp,expected_parent_manifest_sha256=file_sha(mp),window=LONG_WINDOW)
+    return path,table,plan
+
+
+def synthetic_approval(plan):
+    # Fixture only: never an approval for real data or a checked-in operational approval.
+    return dict(status='APPROVED',approved_by='hh4832',approval_ref='https://example.test/SYNTHETIC_ONLY',
+                plan_sha256=plan['plan_sha256'],allow_holdout_decode_for_conversion_only=True,
+                allow_full_source_opaque_hash=True,allow_strategy_run=False)
+
+
+def test_v12_long_window_end_to_end_and_receipt_never_opens_source(tmp_path,monkeypatch):
+    from market_research_core.tsm_development import LONG_WINDOW,renew_development_receipt,window_identity
+    source,table,plan=long_inputs(tmp_path)
+    assert plan['window_identity']==window_identity(LONG_WINDOW)
+    assert plan['requires_research_lead_approval'] and plan['output_holdout_rows']==0
+    bundle=produce_development_snapshot(plan,tmp_path/'out',producer_sha='a'*40,approval=synthetic_approval(plan))
+    root=Path(bundle['snapshot_root']);m=json.loads((root/'manifest.json').read_text());line=json.loads((root/'lineage.json').read_text())
+    assert root.name.startswith('TSM_DEV_1M_20161019_20241231_')
+    assert m['contract']=='tsm-development-snapshot-v1.2'
+    assert m['window_identity']==line['window_identity']==plan['window_identity']
+    assert m['output_holdout_rows']==line['output_holdout_rows']==0
+    assert line['sources'][0]['holdout_decode_occurred'] is True
+    assert line['sources'][0]['opaque_hash_includes_holdout_bytes'] is True
+    assert pq.read_table(root/m['parquet_path']).equals(table.slice(1,4))
+    assert pq.ParquetFile(root/m['parquet_path']).num_row_groups==3
+    report=preflight_development_snapshot(bundle)
+    assert report['native_rows']==4 and len(report['verified_windows'])==3
+    # Remove the entire parent: renewal and preflight must work without original mixed bytes/metadata.
+    import shutil
+    shutil.rmtree(source.parent)
+    assert preflight_development_snapshot(renew_development_receipt(bundle))['status']=='PASS'
+
+
+@pytest.mark.parametrize('window',[DateWindow('2016-10-18','2024-12-31'),DateWindow('2016-10-19','2025-01-01'),DateWindow('2024-01-01','2024-12-31')])
+def test_v12_rejects_every_non_allowlisted_window(tmp_path,window):
+    with pytest.raises(NativeSnapshotRejected,match='DERIVED_WINDOW'):
+        plan_conversion([],parent_manifest_path=tmp_path/'absent',expected_parent_manifest_sha256='0'*64,window=window)
+    with pytest.raises(NativeSnapshotRejected):
+        DevelopmentSnapshotPin('TSM_DEV_1M_20161019_20241231_'+'0'*20,'a'*40,'b'*64,window.start,window.end)
+
+
+def test_v12_pin_cannot_reinterpret_v11():
+    with pytest.raises(NativeSnapshotRejected,match='DERIVED_ID'):
+        DevelopmentSnapshotPin('TSM_DEV_1M_20161019_20241231_'+'0'*20,'a'*40,'b'*64)
+    with pytest.raises(NativeSnapshotRejected,match='DERIVED_ID'):
+        DevelopmentSnapshotPin('TSM_DEV_1M_20240529_20240628_'+'0'*20,'a'*40,'b'*64,'2016-10-19','2024-12-31')
+
+
+def test_v12_missing_and_wrong_approval_stop_before_source_hash_decode_and_output(tmp_path,monkeypatch):
+    source,_,plan=long_inputs(tmp_path)
+    import market_research_core.tsm_development as dev
+    real_hash=dev.file_sha
+    def guarded_hash(path):
+        assert Path(path)!=source,'source hash before approval'
+        return real_hash(path)
+    monkeypatch.setattr(dev,'file_sha',guarded_hash)
+    for approval,code in [(None,'PRODUCER_APPROVAL_REQUIRED'),({**synthetic_approval(plan),'plan_sha256':'0'*64},'PRODUCER_APPROVAL_MISMATCH')]:
+        with pytest.raises(NativeSnapshotRejected,match=code):
+            produce_development_snapshot(plan,tmp_path/'out',producer_sha='a'*40,approval=approval)
+        assert not (tmp_path/'out').exists()
+
+
+def test_v12_wrong_known_source_sha_refused_before_decode(tmp_path):
+    from market_research_core.tsm_development import LONG_WINDOW
+    source,_,plan=long_inputs(tmp_path)
+    mp=Path(plan['parent_manifest_path'])
+    # A syntactically valid parent claim still must match independently hashed bytes.
+    mp.write_text(json.dumps({'results':[{'symbol':'TSM','published_sha256':'0'*64}]}))
+    bad=plan_conversion([{'path':str(source),'expected_sha256':'0'*64,'lineage_ref':'SYNTHETIC_ONLY'}],
+                        parent_manifest_path=mp,expected_parent_manifest_sha256=file_sha(mp),window=LONG_WINDOW)
+    with pytest.raises(NativeSnapshotRejected,match='SOURCE_SHA'):
+        produce_development_snapshot(bad,tmp_path/'out',producer_sha='a'*40,approval=synthetic_approval(bad))
+
+
+@pytest.mark.parametrize('field,value',[('window_identity',{}),('output_holdout_rows',1),('contract','tsm-development-snapshot-v1.1')])
+def test_v12_manifest_identity_mismatch_refused(tmp_path,field,value):
+    _,_,plan=long_inputs(tmp_path)
+    b=produce_development_snapshot(plan,tmp_path/'out',producer_sha='a'*40,approval=synthetic_approval(plan))
+    mp=Path(b['snapshot_root'])/'manifest.json';m=json.loads(mp.read_text());m[field]=value
+    mp.write_text(json.dumps(m));b['manifest_sha256']=file_sha(mp)
+    with pytest.raises(NativeSnapshotRejected,match='DERIVED_'):preflight_development_snapshot(b)
