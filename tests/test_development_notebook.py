@@ -21,7 +21,10 @@ def test_development_notebook_is_pinned_nonconsuming_and_clear():
             'preflight_development_snapshot','prepare_development_proposal','renew_development_receipt'}<=set(calls)
     assert not {'consume','signoff','run_research','run_backtest'} & set(calls)
     assert 'ResearchOnlyRunner' not in source and 'ExecutionEngine' not in source
-    assert "plan['requires_research_lead_approval'] and not PRODUCER_APPROVAL_PATH" in source
+    assert "if plan['requires_research_lead_approval']:" in source
+    assert "elif plan['plan_sha256'] != APPROVED_PLAN_SHA256:" in source
+    assert "confirmation == 'APPROVE ' + APPROVED_PLAN_SHA256" in source
+    assert "if not plan['requires_research_lead_approval'] or approval is not None:" in source
     assert "assert AFTER == BEFORE" in source and 'old_uses() == USES_BEFORE == 0' in source
 
 

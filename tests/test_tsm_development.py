@@ -234,3 +234,29 @@ def test_v12_manifest_identity_mismatch_refused(tmp_path,field,value):
     mp=Path(b['snapshot_root'])/'manifest.json';m=json.loads(mp.read_text());m[field]=value
     mp.write_text(json.dumps(m));b['manifest_sha256']=file_sha(mp)
     with pytest.raises(NativeSnapshotRejected,match='DERIVED_'):preflight_development_snapshot(b)
+
+
+def test_archived_v11_lineage_without_v12_fields_stays_readable(tmp_path):
+    from market_research_core.tsm_development import renew_development_receipt
+    _,_,plan=inputs(tmp_path)
+    assert plan['contract']=='tsm-producer-conversion-plan-v1' and 'window_identity' not in plan
+    b=produce_development_snapshot(plan,tmp_path/'out',producer_sha='a'*40)
+    root=Path(b['snapshot_root']);lp=root/'lineage.json';mp=root/'manifest.json'
+    line=json.loads(lp.read_text())
+    for source in line['sources']:source.pop('opaque_hash_includes_holdout_bytes',None)
+    assert 'window_identity' not in line and 'output_holdout_rows' not in line
+    lp.write_text(json.dumps(line));lsha=file_sha(lp)
+    m=json.loads(mp.read_text());m['lineage_sha256']=lsha;mp.write_text(json.dumps(m))
+    b['snapshot_pin']['lineage_sha256']=lsha;b['manifest_sha256']=file_sha(mp)
+    assert preflight_development_snapshot(renew_development_receipt(b))['native_rows']==60
+
+
+@pytest.mark.parametrize('field,value',[('holdout_decode_occurred',False),('opaque_hash_includes_holdout_bytes',False),('decoded_row_groups',[])])
+def test_v12_lineage_cannot_hide_approved_holdout_exposure(tmp_path,field,value):
+    _,_,plan=long_inputs(tmp_path)
+    b=produce_development_snapshot(plan,tmp_path/'out',producer_sha='a'*40,approval=synthetic_approval(plan))
+    root=Path(b['snapshot_root']);lp=root/'lineage.json';mp=root/'manifest.json'
+    line=json.loads(lp.read_text());line['sources'][0][field]=value;lp.write_text(json.dumps(line))
+    m=json.loads(mp.read_text());m['lineage_sha256']=file_sha(lp);mp.write_text(json.dumps(m))
+    b['snapshot_pin']['lineage_sha256']=file_sha(lp);b['manifest_sha256']=file_sha(mp)
+    with pytest.raises(NativeSnapshotRejected,match='DERIVED_LINEAGE'):preflight_development_snapshot(b)
