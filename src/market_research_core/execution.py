@@ -17,6 +17,7 @@ import pandas as pd
 
 from .costs import CostProfile, calculate_fill_costs, adverse_fill_price
 from .temporal import TemporalPolicy, validate_conservative_bars
+from .dated_costs import DatedCostSchedule, new_york_fill_date
 
 
 @dataclass(frozen=True)
@@ -158,7 +159,27 @@ class ExecutionEngine:
         *,
         cost_profile: CostProfile,
         config: ExecutionConfig,
+        cost_schedule: DatedCostSchedule | None = None,
     ) -> ExecutionResult:
+        if cost_schedule is not None:
+            if not isinstance(cost_schedule, DatedCostSchedule):
+                raise ValueError("a pinned DatedCostSchedule is required")
+            if cost_profile.sha256 != cost_schedule.base_profile.sha256:
+                raise ValueError("cost schedule/base profile SHA mismatch")
+            cost_profile = cost_schedule.base_profile  # immutable document snapshot; no caller-owned nested dicts
+            if config.permitted_usage_scope != 'RESEARCH_ONLY':
+                raise ValueError('dated TSM costs are RESEARCH_ONLY, never formal cost approval')
+            if (cost_schedule.document['evidence_kind'] == 'SYNTHETIC_FIXTURE'
+                    and not str(config.dataset_snapshot_id).startswith('SYNTHETIC_')):
+                raise ValueError('synthetic rate evidence cannot price a real dataset')
+            if (config.window_start is None) != (config.window_end is None):
+                raise ValueError('dated cost coverage requires both execution window bounds')
+            if config.window_start is not None:
+                start = _ts(config.window_start, config.timestamp_timezone)
+                end = _ts(config.window_end, config.timestamp_timezone)
+                if start >= end:
+                    raise ValueError('invalid dated cost execution window')
+                cost_schedule.require_coverage(new_york_fill_date(start), new_york_fill_date(end-pd.Timedelta(nanoseconds=1)))
         missing = _REQUIRED_COLUMNS - set(bars.columns)
         if missing:
             raise ValueError(f"bars missing required execution columns: {sorted(missing)}")
@@ -213,6 +234,8 @@ class ExecutionEngine:
         # the bar where a fill occurs, never in order-creation order.
         records: list[dict[str, Any]] = []
         for order_idx, order in enumerate(orders):
+            if cost_schedule is not None and (order.symbol, order.market) != ('TSM', 'IBKR_EQUITY'):
+                raise ValueError('cost schedule symbol/market mismatch')
             oid = order.order_id or f"order-{order_idx + 1}"
             signal_time = _ts(order.signal_time, config.timestamp_timezone)
             available = _ts(order.signal_available_at, config.timestamp_timezone)
@@ -274,6 +297,12 @@ class ExecutionEngine:
                 "signed_remaining": 0.0,
             })
 
+        if cost_schedule is not None:
+            # Validate all potential fill dates before the event loop changes cash/lots.
+            # Warm-up bars with no candidate orders need no inferred historical fee.
+            candidate_dates = [new_york_fill_date(ts) for record in records for ts in record['candidate_rows']]
+            if candidate_dates:
+                cost_schedule.require_coverage(min(candidate_dates), max(candidate_dates))
         bars_by_time: dict[pd.Timestamp, dict[tuple[str, str, str], pd.Series]] = {}
         for _, bar in frame.iterrows():
             ts = pd.Timestamp(bar["bar_start"])
@@ -359,9 +388,10 @@ class ExecutionEngine:
                     record["done"] = True
                     continue
 
+                fill_profile = cost_schedule.profile_for(bar['bar_start']) if cost_schedule is not None else cost_profile
                 reason: str | None = None
-                cost_meta = cost_profile.configuration_metadata
-                fill_date = bar['bar_start'].date().isoformat()
+                cost_meta = fill_profile.configuration_metadata
+                fill_date = new_york_fill_date(bar['bar_start']) if cost_schedule is not None else bar['bar_start'].date().isoformat()
                 cost_date_ok = not cost_meta or (cost_meta['effective_from'] <= fill_date and
                                 (cost_meta['effective_to'] is None or fill_date <= cost_meta['effective_to']))
                 daytrade_ok = not cost_meta.get('daytrade_evidence') or side != 'SELL' or (
@@ -380,7 +410,7 @@ class ExecutionEngine:
                     reason = "BAR_NOT_ELIGIBLE"
                 elif float(bar["volume"]) <= 0:
                     reason = "ZERO_VOLUME_BAR"
-                elif cost_profile.volume_participation_cap is not None and qty > float(bar["volume"]) * cost_profile.volume_participation_cap:
+                elif fill_profile.volume_participation_cap is not None and qty > float(bar["volume"]) * fill_profile.volume_participation_cap:
                     reason = "VOLUME_PARTICIPATION_EXCEEDED"
                 else:
                     eligible_col = "buy_execution_eligible" if side == "BUY" else "sell_execution_eligible"
@@ -415,18 +445,18 @@ class ExecutionEngine:
                     raw_price = min(float(bar["open"]), float(order.limit_price)) if side == "BUY" else max(float(bar["open"]), float(order.limit_price))
                 else:
                     raw_price = float(bar["open"])
-                fill_price = adverse_fill_price(raw_price, side, cost_profile, config.cost_multiplier)
+                fill_price = adverse_fill_price(raw_price, side, fill_profile, config.cost_multiplier)
                 if order.order_type == "LIMIT":
                     fill_price = min(fill_price, float(order.limit_price)) if side == "BUY" else max(fill_price, float(order.limit_price))
                 cost_multiplier = Decimal(str(config.cost_multiplier))
-                cost_parts = {k: v * cost_multiplier for k, v in calculate_fill_costs(fill_price, qty, side, cost_profile).items()}
+                cost_parts = {k: v * cost_multiplier for k, v in calculate_fill_costs(fill_price, qty, side, fill_profile).items()}
                 fee = cost_parts['commission'] + cost_parts['exchange_fee'] + cost_parts['clearing_fee']
                 tax, regulatory_fee = cost_parts['transaction_tax'], cost_parts['regulatory_fee']
                 signed_delta = qty if side == "BUY" else -qty
                 current_net = sum(lot["signed_qty"] for lot in lots.get(key, []))
                 resulting_net = current_net + signed_delta
-                multiplier = cost_profile.contract_multiplier if cost_profile.instrument_type == "FUTURES" else 1.0
-                if cost_profile.instrument_type == "FUTURES" and config.initial_margin_per_contract is not None:
+                multiplier = fill_profile.contract_multiplier if fill_profile.instrument_type == "FUTURES" else 1.0
+                if fill_profile.instrument_type == "FUTURES" and config.initial_margin_per_contract is not None:
                     required_margin = abs(resulting_net) * config.initial_margin_per_contract
                     if required_margin > cash + 1e-9:
                         rejects.append({"order_id": oid, "bar_ts": bar["bar_start"], "reason": "INSUFFICIENT_MARGIN",
@@ -452,19 +482,19 @@ class ExecutionEngine:
                 fill['raw_price'] = raw_price
                 fill['price_adjustment_cost'] = abs(Decimal(str(fill_price)) - Decimal(str(raw_price))) * Decimal(str(qty)) * Decimal(str(multiplier))
                 monetary_scale = Decimal(str(qty)) * Decimal(str(multiplier))
-                if cost_profile.equity_slippage_bps is not None:
-                    slip_move = Decimal(str(raw_price)) * Decimal(str(cost_profile.equity_slippage_bps)) / Decimal('10000')
+                if fill_profile.equity_slippage_bps is not None:
+                    slip_move = Decimal(str(raw_price)) * Decimal(str(fill_profile.equity_slippage_bps)) / Decimal('10000')
                 else:
-                    slip_move = Decimal(str(cost_profile.slippage_ticks)) * Decimal(str(cost_profile.tick_size))
-                spread_move = Decimal(str(raw_price)) * Decimal(str(cost_profile.half_spread_bps or 0)) / Decimal('10000')
+                    slip_move = Decimal(str(fill_profile.slippage_ticks)) * Decimal(str(fill_profile.tick_size))
+                spread_move = Decimal(str(raw_price)) * Decimal(str(fill_profile.half_spread_bps or 0)) / Decimal('10000')
                 fill['slippage_cost'] = slip_move * monetary_scale * cost_multiplier
                 fill['spread_cost'] = spread_move * monetary_scale * cost_multiplier
                 fill['tick_rounding_cost'] = fill['price_adjustment_cost'] - fill['slippage_cost'] - fill['spread_cost']
                 fill['explicit_cost'] = fee + tax + regulatory_fee
-                fill['commission_scope'] = cost_profile.fee_mode or 'LEGACY'
-                fill['cost_profile_id'] = cost_profile.profile_id
-                fill['cost_profile_version'] = cost_profile.version
-                fill['cost_profile_sha256'] = cost_profile.sha256
+                fill['commission_scope'] = fill_profile.fee_mode or 'LEGACY'
+                fill['cost_profile_id'] = fill_profile.profile_id
+                fill['cost_profile_version'] = fill_profile.version
+                fill['cost_profile_sha256'] = fill_profile.sha256
                 if config.temporal_policy is not None:
                     fill.update(temporal_policy_id=config.temporal_policy.policy_id,
                                 temporal_policy_version=config.temporal_policy.version,
@@ -475,6 +505,13 @@ class ExecutionEngine:
                                 candidate_modeled_available_at=bar['modeled_available_at'],
                                 candidate_possible_open_latest=bar['possible_open_latest'],
                                 execution_eligibility_scope='RESEARCH_ONLY')
+                if cost_schedule is not None:
+                    document = cost_schedule.document
+                    fill.update(cost_schedule_sha256=cost_schedule.sha256, cost_schedule_id=document['schedule_id'],
+                        cost_schedule_version=document['version'], cost_schedule_scenario=cost_schedule.scenario,
+                        cost_effective_date=fill_date,
+                        sec_rate_record_sha256=cost_meta['phase4a_cost_model']['sec_rate_record_sha256'],
+                        taf_rate_record_sha256=cost_meta['phase4a_cost_model']['taf_rate_record_sha256'])
                 fills.append(fill)
                 record["done"] = True
                 record["signed_remaining"] = 0.0
@@ -650,6 +687,19 @@ class ExecutionEngine:
                               execution_eligibility_scope='RESEARCH_ONLY')
         provenance['cost_configuration'] = cost_profile.configuration_metadata
         provenance['fee_mode'] = cost_profile.fee_mode
+        if cost_schedule is not None:
+            document = cost_schedule.document
+            provenance.update(engine_version='2.3.0', dated_cost_contract='tsm-dated-trading-costs-v1',
+                cost_schedule_sha256=cost_schedule.sha256, cost_schedule_id=document['schedule_id'],
+                cost_schedule_version=document['version'], cost_schedule_scenario=cost_schedule.scenario,
+                cost_schedule_timezone=document['timezone'], cost_schedule_coverage=document['coverage'],
+                cost_schedule_evidence_kind=document['evidence_kind'],
+                applied_cost_profile_sha256=sorted({fill['cost_profile_sha256'] for fill in fills}),
+                cost_profile_selection='AMERICA_NEW_YORK_DATE_OF_EACH_FILL',
+                cost_state_reset=False, cost_profile_components_role='BASE_TEMPLATE_ONLY',
+                base_cost_profile_sha256=cost_profile.sha256,
+                cost_configuration={'base_profile_configuration':cost_profile.configuration_metadata,
+                                    'dated_cost_schedule':document})
         formal_eligible = (
             config.permitted_usage_scope == "BACKTEST"
             and config.available_at_policy == "OBSERVED"

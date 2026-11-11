@@ -104,6 +104,9 @@ def tsm_cost_diagnostics(result, profile) -> dict:
     disclosure of rounded cost, not an independent fee calculator or a tax return.
     Slippage is already in fill_price and is reported separately, never deducted again.
     """
+    from .dated_costs import DatedCostSchedule, dated_tsm_cost_diagnostics
+    if isinstance(profile, DatedCostSchedule):
+        return dated_tsm_cost_diagnostics(result, profile)
     model=profile.configuration_metadata.get('phase4a_cost_model')
     if not model:
         raise ValueError('Phase4-A profile required')
