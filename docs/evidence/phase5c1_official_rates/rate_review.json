@@ -1,0 +1,261 @@
+{
+  "contract": "official-historical-rate-review-v2",
+  "historical_rate_status": "DATA_READY",
+  "sec_trade_date_mapping": "DATA_PENDING: official SEC charge dates are not universal trade dates; Schedule applies unchanged NY fill-date research convention",
+  "rates": [
+    {
+      "component": "SEC",
+      "effective_from": "2017-01-01",
+      "effective_to": "2017-07-03",
+      "original_effective_from": "2016-02-16",
+      "publication_date": "2016-01-07",
+      "original_rate": "21.80",
+      "original_unit": "USD_PER_MILLION_NOTIONAL",
+      "rate": "0.0000218",
+      "unit": "USD_PER_NOTIONAL",
+      "source_id": "sec-2016-2",
+      "date_basis": "SEC_CHARGE_DATE",
+      "verification_status": "VERIFIED",
+      "cross_checks": [
+        "sec-2017-111",
+        "sec-2016-35",
+        "sec-2016-206"
+      ],
+      "source_document_sha256": "4535eeff87702d55b1b3105912b3ec158397430ddc62aff0f2f0adb2957652cb"
+    },
+    {
+      "component": "SEC",
+      "effective_from": "2017-07-04",
+      "effective_to": "2018-05-21",
+      "original_effective_from": "2017-07-04",
+      "publication_date": "2017-05-31",
+      "original_rate": "23.10",
+      "original_unit": "USD_PER_MILLION_NOTIONAL",
+      "rate": "0.0000231",
+      "unit": "USD_PER_NOTIONAL",
+      "source_id": "sec-2017-111",
+      "date_basis": "SEC_CHARGE_DATE",
+      "verification_status": "VERIFIED",
+      "cross_checks": [
+        "sec-2018-67"
+      ],
+      "source_document_sha256": "a8a1adb275c7c31b36eb704cf22b7b858426af440c648a45055a8418459b2735"
+    },
+    {
+      "component": "SEC",
+      "effective_from": "2018-05-22",
+      "effective_to": "2019-04-15",
+      "original_effective_from": "2018-05-22",
+      "publication_date": "2018-04-17",
+      "original_rate": "13.00",
+      "original_unit": "USD_PER_MILLION_NOTIONAL",
+      "rate": "0.000013",
+      "unit": "USD_PER_NOTIONAL",
+      "source_id": "sec-2018-67",
+      "date_basis": "SEC_CHARGE_DATE",
+      "verification_status": "VERIFIED",
+      "cross_checks": [
+        "sec-2019-30"
+      ],
+      "source_document_sha256": "4b67948e5316329c52c547e4c68df4d2ff1d62ae3d0a6473a669f5baad2fa2f3"
+    },
+    {
+      "component": "SEC",
+      "effective_from": "2019-04-16",
+      "effective_to": "2020-02-17",
+      "original_effective_from": "2019-04-16",
+      "publication_date": "2019-03-12",
+      "original_rate": "20.70",
+      "original_unit": "USD_PER_MILLION_NOTIONAL",
+      "rate": "0.0000207",
+      "unit": "USD_PER_NOTIONAL",
+      "source_id": "sec-2019-30",
+      "date_basis": "SEC_CHARGE_DATE",
+      "verification_status": "VERIFIED",
+      "cross_checks": [
+        "sec-2020-7"
+      ],
+      "source_document_sha256": "c35e8a4a4394bc2bd5f48145b18331bc45d2061ae69753f653b93849a89fff56"
+    },
+    {
+      "component": "SEC",
+      "effective_from": "2020-02-18",
+      "effective_to": "2021-02-24",
+      "original_effective_from": "2020-02-18",
+      "publication_date": "2020-01-09",
+      "original_rate": "22.10",
+      "original_unit": "USD_PER_MILLION_NOTIONAL",
+      "rate": "0.0000221",
+      "unit": "USD_PER_NOTIONAL",
+      "source_id": "sec-2020-7",
+      "date_basis": "SEC_CHARGE_DATE",
+      "verification_status": "VERIFIED",
+      "cross_checks": [
+        "sec-2021-8"
+      ],
+      "source_document_sha256": "515a086c63f77079918e9683141f6edd936bdb65de98e29385ed6c5ae7973550"
+    },
+    {
+      "component": "SEC",
+      "effective_from": "2021-02-25",
+      "effective_to": "2022-05-13",
+      "original_effective_from": "2021-02-25",
+      "publication_date": "2021-01-15",
+      "original_rate": "5.10",
+      "original_unit": "USD_PER_MILLION_NOTIONAL",
+      "rate": "0.0000051",
+      "unit": "USD_PER_NOTIONAL",
+      "source_id": "sec-2021-8",
+      "date_basis": "SEC_CHARGE_DATE",
+      "verification_status": "VERIFIED",
+      "cross_checks": [
+        "sec-2022-60"
+      ],
+      "source_document_sha256": "02c8324ca3a9a9db803e06fd970c1ec1f8be8041703520fd76bfd304bc2dc6af"
+    },
+    {
+      "component": "SEC",
+      "effective_from": "2022-05-14",
+      "effective_to": "2023-02-26",
+      "original_effective_from": "2022-05-14",
+      "publication_date": "2022-04-08",
+      "original_rate": "22.90",
+      "original_unit": "USD_PER_MILLION_NOTIONAL",
+      "rate": "0.0000229",
+      "unit": "USD_PER_NOTIONAL",
+      "source_id": "sec-2022-60",
+      "date_basis": "SEC_CHARGE_DATE",
+      "verification_status": "VERIFIED",
+      "cross_checks": [
+        "sec-2023-15"
+      ],
+      "source_document_sha256": "92e3d2266099c0735d2b1edac16afe4b1b3146cd7207e3fe9c281d04e1b04f1b"
+    },
+    {
+      "component": "SEC",
+      "effective_from": "2023-02-27",
+      "effective_to": "2024-05-21",
+      "original_effective_from": "2023-02-27",
+      "publication_date": "2023-01-23",
+      "original_rate": "8.00",
+      "original_unit": "USD_PER_MILLION_NOTIONAL",
+      "rate": "0.000008",
+      "unit": "USD_PER_NOTIONAL",
+      "source_id": "sec-2023-15",
+      "date_basis": "SEC_CHARGE_DATE",
+      "verification_status": "VERIFIED",
+      "cross_checks": [
+        "sec-2024-2"
+      ],
+      "source_document_sha256": "596dad0b1a212aa835313fbbf390d9ce41feabe334f72865184fde6e4664c206"
+    },
+    {
+      "component": "SEC",
+      "effective_from": "2024-05-22",
+      "effective_to": "2024-12-31",
+      "original_effective_from": "2024-05-22",
+      "publication_date": "2024-04-17",
+      "original_rate": "27.80",
+      "original_unit": "USD_PER_MILLION_NOTIONAL",
+      "rate": "0.0000278",
+      "unit": "USD_PER_NOTIONAL",
+      "source_id": "sec-2024-2",
+      "date_basis": "SEC_CHARGE_DATE",
+      "verification_status": "VERIFIED",
+      "cross_checks": [
+        "sec-2025-2"
+      ],
+      "source_document_sha256": "994781fe09bdfd34d6518f62c882ba0bd95faf1ad8cdf0ad557e8ae358fc7ead"
+    },
+    {
+      "component": "TAF",
+      "effective_from": "2017-01-01",
+      "effective_to": "2021-12-31",
+      "original_effective_from": "2012-07-01",
+      "publication_date": "2012-06-22",
+      "original_rate": "0.000119",
+      "original_unit": "USD_PER_SHARE",
+      "rate": "0.000119",
+      "unit": "USD_PER_SHARE",
+      "official_per_trade_cap_usd": "5.95",
+      "official_side": "SALE",
+      "source_id": "finra-524551",
+      "date_basis": "TRADE_DATE",
+      "verification_status": "VERIFIED",
+      "cross_checks": [
+        "sec-34-90176",
+        "finra-2020-032",
+        "sec-34-67242",
+        "finra-1207221"
+      ],
+      "source_document_sha256": "ffe660782c995c19f5448451d21d997fec708523a4d6f841a7c883bfb9203adf",
+      "publication_date_basis": "SEC predecessor approval 34-67242; primary historical rule revision is not the announcement"
+    },
+    {
+      "component": "TAF",
+      "effective_from": "2022-01-01",
+      "effective_to": "2022-12-31",
+      "original_effective_from": "2022-01-01",
+      "publication_date": "2020-10-02",
+      "original_rate": "0.000130",
+      "original_unit": "USD_PER_SHARE",
+      "rate": "0.000130",
+      "unit": "USD_PER_SHARE",
+      "official_per_trade_cap_usd": "6.49",
+      "official_side": "SALE",
+      "source_id": "finra-2020-032",
+      "date_basis": "TRADE_DATE",
+      "verification_status": "VERIFIED",
+      "cross_checks": [
+        "sec-34-90176",
+        "finra-2020-032",
+        "finra-1207251"
+      ],
+      "source_document_sha256": "ddac2be95898c8d7fd43c02e5e1d92fd953c2ccb0a5bf312bd5cc4342bd13cd0"
+    },
+    {
+      "component": "TAF",
+      "effective_from": "2023-01-01",
+      "effective_to": "2023-12-31",
+      "original_effective_from": "2023-01-01",
+      "publication_date": "2020-10-02",
+      "original_rate": "0.000145",
+      "original_unit": "USD_PER_SHARE",
+      "rate": "0.000145",
+      "unit": "USD_PER_SHARE",
+      "official_per_trade_cap_usd": "7.27",
+      "official_side": "SALE",
+      "source_id": "finra-2020-032",
+      "date_basis": "TRADE_DATE",
+      "verification_status": "VERIFIED",
+      "cross_checks": [
+        "sec-34-90176",
+        "finra-2020-032",
+        "finra-1803996"
+      ],
+      "source_document_sha256": "ddac2be95898c8d7fd43c02e5e1d92fd953c2ccb0a5bf312bd5cc4342bd13cd0"
+    },
+    {
+      "component": "TAF",
+      "effective_from": "2024-01-01",
+      "effective_to": "2024-12-31",
+      "original_effective_from": "2024-01-01",
+      "publication_date": "2020-10-02",
+      "original_rate": "0.000166",
+      "original_unit": "USD_PER_SHARE",
+      "rate": "0.000166",
+      "unit": "USD_PER_SHARE",
+      "official_per_trade_cap_usd": "8.30",
+      "official_side": "SALE",
+      "source_id": "finra-2020-032",
+      "date_basis": "TRADE_DATE",
+      "verification_status": "VERIFIED",
+      "cross_checks": [
+        "sec-34-90176",
+        "finra-2020-032",
+        "finra-1880951"
+      ],
+      "source_document_sha256": "ddac2be95898c8d7fd43c02e5e1d92fd953c2ccb0a5bf312bd5cc4342bd13cd0"
+    }
+  ]
+}

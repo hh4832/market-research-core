@@ -1,0 +1,18 @@
+{
+  "contract": "official-historical-cost-data-readiness-v1",
+  "historical_data_status": "DATA_READY",
+  "scope": "HISTORICAL_RATES_ONLY_RESEARCH_CONVENTION",
+  "sec_coverage": "PASS",
+  "taf_coverage": "PASS",
+  "source_and_effective_date_review": "PASS",
+  "source_and_schedule_sha": "PASS",
+  "schedule_sha256": "43b6045758760a40ad88d741b1a97a73cfb0b6cf6b2a4a7f1f3b31d5085a4216",
+  "sec_broker_trade_to_charge_date_mapping": "DATA_PENDING",
+  "phase5c1_execution_ready": false,
+  "formal_market_gate": "UNCHANGED_NO_GO",
+  "research_execution": "NOT_EXECUTED",
+  "batch_consumption": 0,
+  "formal_research_authorized": false,
+  "synthetic_and_regression_tests": "PASS: 173 passed",
+  "overall_broker_actual_data_status": "DATA_PENDING_SEC_CHARGE_DATE_MAPPING"
+}

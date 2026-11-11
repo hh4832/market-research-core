@@ -1,0 +1,54 @@
+{
+  "contract": "dated-cost-data-readiness-v1",
+  "capability_status": "CAPABILITY_IMPLEMENTED",
+  "historical_data_status": "DATA_PENDING",
+  "overall_status": "CAPABILITY_IMPLEMENTED_DATA_PENDING",
+  "phase5c1_execution_ready": false,
+  "formal_market_gate": "UNCHANGED_NO_GO",
+  "cost_contract": "tsm-dated-trading-costs-v1",
+  "required_trade_dates": {
+    "start": "2017-01-01",
+    "end": "2024-12-31",
+    "timezone": "America/New_York"
+  },
+  "verified_loadable_coverage": {
+    "SEC": [],
+    "TAF": []
+  },
+  "missing_intervals": [
+    {
+      "component": "SEC",
+      "start": "2017-01-01",
+      "end": "2024-12-31",
+      "requires": "Official Section 31 effective-date advisories, predecessor/successor boundaries, unit conversion review, original source document SHA256 and canonical record SHA256"
+    },
+    {
+      "component": "TAF",
+      "start": "2017-01-01",
+      "end": "2024-12-31",
+      "requires": "Official FINRA TAF schedules/notices/rule filings for all effective intervals, original source document SHA256 and canonical record SHA256"
+    }
+  ],
+  "existing_inputs": [
+    {
+      "path": "configs/cost_profiles/ibkr_fixed_equity.json",
+      "applicability_start": "2025-01-01",
+      "SEC_rate": null,
+      "status": "PLACEHOLDER_NOT_HISTORICAL_EVIDENCE"
+    },
+    {
+      "path": "configs/research/tsm_phase4a_required_evidence.json",
+      "status": "PENDING_SEC_AND_TAF_INPUTS"
+    },
+    {
+      "path": "docs/evidence/phase4a_real_snapshot_probe_20261106_080607.json",
+      "status": "DIAGNOSTIC_ONLY_NOT_A_VERIFIED_RATE_HISTORY"
+    }
+  ],
+  "official_history_retrieved_in_this_task": false,
+  "research_execution": "NOT_EXECUTED",
+  "batch_consumption": 0,
+  "rate_extrapolation_permitted": false,
+  "strategy_or_dataset_contract_changed": false,
+  "note": "This file is a readiness report, NOT a loadable rate schedule. Source review, complete dated history and Agent integration remain necessary. No GO is claimed."
+}
