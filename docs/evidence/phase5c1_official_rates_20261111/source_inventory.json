@@ -1,0 +1,238 @@
+{
+  "contract": "official-rate-source-inventory-review-v1",
+  "review_date": "2026-11-11",
+  "status": "DATA_PENDING",
+  "sources": [
+    {
+      "source_id": "SEC-2016-2",
+      "url": "https://www.sec.gov/news/pressrelease/2016-2.html",
+      "publication_date": "2016-01-07",
+      "role": "SEC rate establishment",
+      "review_locator": "Announcement body: new rate, charge-date effective boundary, predecessor rate through previous day",
+      "review_status": "WEB_TEXT_REVIEWED_RAW_BYTES_PENDING",
+      "original_document_sha256": null,
+      "retained_original_path": null,
+      "blocker": "Cloud egress allowlist rejects official host (CONNECT 403); search-tool rendered text is not original document bytes."
+    },
+    {
+      "source_id": "SEC-2017-111",
+      "url": "https://www.sec.gov/newsroom/press-releases/2017-111",
+      "publication_date": "2017-05-31",
+      "role": "SEC rate establishment",
+      "review_locator": "Announcement body: new rate, charge-date effective boundary, predecessor rate through previous day",
+      "review_status": "WEB_TEXT_REVIEWED_RAW_BYTES_PENDING",
+      "original_document_sha256": null,
+      "retained_original_path": null,
+      "blocker": "Cloud egress allowlist rejects official host (CONNECT 403); search-tool rendered text is not original document bytes."
+    },
+    {
+      "source_id": "SEC-2018-67",
+      "url": "https://www.sec.gov/newsroom/press-releases/2018-67",
+      "publication_date": "2018-04-17",
+      "role": "SEC rate establishment",
+      "review_locator": "Announcement body: new rate, charge-date effective boundary, predecessor rate through previous day",
+      "review_status": "WEB_TEXT_REVIEWED_RAW_BYTES_PENDING",
+      "original_document_sha256": null,
+      "retained_original_path": null,
+      "blocker": "Cloud egress allowlist rejects official host (CONNECT 403); search-tool rendered text is not original document bytes."
+    },
+    {
+      "source_id": "SEC-2019-30",
+      "url": "https://www.sec.gov/newsroom/press-releases/2019-30",
+      "publication_date": "2019-03-12",
+      "role": "SEC rate establishment",
+      "review_locator": "Announcement body: new rate, charge-date effective boundary, predecessor rate through previous day",
+      "review_status": "WEB_TEXT_REVIEWED_RAW_BYTES_PENDING",
+      "original_document_sha256": null,
+      "retained_original_path": null,
+      "blocker": "Cloud egress allowlist rejects official host (CONNECT 403); search-tool rendered text is not original document bytes."
+    },
+    {
+      "source_id": "SEC-2020-7",
+      "url": "https://www.sec.gov/newsroom/press-releases/2020-7",
+      "publication_date": "2020-01-09",
+      "role": "SEC rate establishment",
+      "review_locator": "Announcement body: new rate, charge-date effective boundary, predecessor rate through previous day",
+      "review_status": "WEB_TEXT_REVIEWED_RAW_BYTES_PENDING",
+      "original_document_sha256": null,
+      "retained_original_path": null,
+      "blocker": "Cloud egress allowlist rejects official host (CONNECT 403); search-tool rendered text is not original document bytes."
+    },
+    {
+      "source_id": "SEC-2021-8",
+      "url": "https://www.sec.gov/newsroom/press-releases/2021-8",
+      "publication_date": "2021-01-15",
+      "role": "SEC rate establishment",
+      "review_locator": "Announcement body: new rate, charge-date effective boundary, predecessor rate through previous day",
+      "review_status": "WEB_TEXT_REVIEWED_RAW_BYTES_PENDING",
+      "original_document_sha256": null,
+      "retained_original_path": null,
+      "blocker": "Cloud egress allowlist rejects official host (CONNECT 403); search-tool rendered text is not original document bytes."
+    },
+    {
+      "source_id": "SEC-2022-60",
+      "url": "https://www.sec.gov/newsroom/press-releases/2022-60",
+      "publication_date": "2022-04-08",
+      "role": "SEC rate establishment",
+      "review_locator": "Announcement body: new rate, charge-date effective boundary, predecessor rate through previous day",
+      "review_status": "WEB_TEXT_REVIEWED_RAW_BYTES_PENDING",
+      "original_document_sha256": null,
+      "retained_original_path": null,
+      "blocker": "Cloud egress allowlist rejects official host (CONNECT 403); search-tool rendered text is not original document bytes."
+    },
+    {
+      "source_id": "SEC-2023-15",
+      "url": "https://www.sec.gov/newsroom/press-releases/2023-15",
+      "publication_date": "2023-01-23",
+      "role": "SEC rate establishment",
+      "review_locator": "Announcement body: new rate, charge-date effective boundary, predecessor rate through previous day",
+      "review_status": "WEB_TEXT_REVIEWED_RAW_BYTES_PENDING",
+      "original_document_sha256": null,
+      "retained_original_path": null,
+      "blocker": "Cloud egress allowlist rejects official host (CONNECT 403); search-tool rendered text is not original document bytes."
+    },
+    {
+      "source_id": "SEC-2024-2",
+      "url": "https://www.sec.gov/rules-regulations/fee-rate-advisories/2024-2",
+      "publication_date": "2024-04-17",
+      "role": "SEC rate establishment",
+      "review_locator": "Announcement body: new rate, charge-date effective boundary, predecessor rate through previous day",
+      "review_status": "WEB_TEXT_REVIEWED_RAW_BYTES_PENDING",
+      "original_document_sha256": null,
+      "retained_original_path": null,
+      "blocker": "Cloud egress allowlist rejects official host (CONNECT 403); search-tool rendered text is not original document bytes."
+    },
+    {
+      "source_id": "TAF-12-31",
+      "url": "https://www.finra.org/rules-guidance/notices/12-31",
+      "publication_date": "2012-06-25",
+      "role": "TAF predecessor rate",
+      "review_locator": "Executive Summary; Background & Discussion; footnotes 1 and 7 (trade date, not settlement date)",
+      "review_status": "WEB_TEXT_REVIEWED_RAW_BYTES_PENDING",
+      "original_document_sha256": null,
+      "retained_original_path": null,
+      "blocker": "Cloud egress allowlist rejects official host (CONNECT 403); search-tool rendered text is not original document bytes."
+    },
+    {
+      "source_id": "TAF-2020-032",
+      "url": "https://www.finra.org/sites/default/files/2020-10/SR-FINRA-2020-032.pdf",
+      "publication_date": "2020-10-02",
+      "role": "TAF 2022-2024 phased implementation",
+      "review_locator": "Page 20 (current/2021/2022/2023/2024 table); Exhibit 5A p130, 5B p138, 5C p142; equity rates p140 and p144",
+      "review_status": "WEB_TEXT_REVIEWED_RAW_BYTES_PENDING",
+      "original_document_sha256": null,
+      "retained_original_path": null,
+      "blocker": "Cloud egress allowlist rejects official host (CONNECT 403); search-tool rendered text is not original document bytes."
+    },
+    {
+      "source_id": "SEC-2016-206",
+      "url": "https://www.sec.gov/news/pressrelease/2016-206.html",
+      "publication_date": "2016-09-30",
+      "role": "SEC carry-forward confirmation",
+      "review_locator": "FY2017 continuing resolution; 21.80 remains",
+      "review_status": "WEB_TEXT_REVIEWED_RAW_BYTES_PENDING",
+      "original_document_sha256": null,
+      "retained_original_path": null,
+      "blocker": "Cloud egress allowlist rejects official host (CONNECT 403); search-tool rendered text is not original document bytes."
+    },
+    {
+      "source_id": "SEC-2017-183",
+      "url": "https://www.sec.gov/newsroom/press-releases/2017-183",
+      "publication_date": "2017-09-29",
+      "role": "SEC carry-forward confirmation",
+      "review_locator": "FY2018 continuing resolution; 23.10 remains",
+      "review_status": "WEB_TEXT_REVIEWED_RAW_BYTES_PENDING",
+      "original_document_sha256": null,
+      "retained_original_path": null,
+      "blocker": "Cloud egress allowlist rejects official host (CONNECT 403); search-tool rendered text is not original document bytes."
+    },
+    {
+      "source_id": "SEC-2020-49",
+      "url": "https://www.sec.gov/newsroom/press-releases/2020-49",
+      "publication_date": "2020-02-28",
+      "role": "SEC no mid-year adjustment",
+      "review_locator": "22.10 remains; links annual advisory",
+      "review_status": "WEB_TEXT_REVIEWED_RAW_BYTES_PENDING",
+      "original_document_sha256": null,
+      "retained_original_path": null,
+      "blocker": "Cloud egress allowlist rejects official host (CONNECT 403); search-tool rendered text is not original document bytes."
+    },
+    {
+      "source_id": "SEC-2021-36",
+      "url": "https://www.sec.gov/newsroom/press-releases/2021-36",
+      "publication_date": "2021-02-26",
+      "role": "SEC no mid-year adjustment",
+      "review_locator": "5.10 remains; links annual advisory",
+      "review_status": "WEB_TEXT_REVIEWED_RAW_BYTES_PENDING",
+      "original_document_sha256": null,
+      "retained_original_path": null,
+      "blocker": "Cloud egress allowlist rejects official host (CONNECT 403); search-tool rendered text is not original document bytes."
+    },
+    {
+      "source_id": "SEC-2023-41",
+      "url": "https://www.sec.gov/newsroom/press-releases/2023-41",
+      "publication_date": "2023-03-01",
+      "role": "SEC no mid-year adjustment",
+      "review_locator": "8.00 remains; links annual advisory",
+      "review_status": "WEB_TEXT_REVIEWED_RAW_BYTES_PENDING",
+      "original_document_sha256": null,
+      "retained_original_path": null,
+      "blocker": "Cloud egress allowlist rejects official host (CONNECT 403); search-tool rendered text is not original document bytes."
+    },
+    {
+      "source_id": "SEC-2025-2",
+      "url": "https://www.sec.gov/rules-regulations/fee-rate-advisories/2025-2",
+      "publication_date": "2025-04-08",
+      "role": "SEC terminal boundary cross-check",
+      "review_locator": "27.80 remains through 2025-05-13; confirms requested 2024 end",
+      "review_status": "WEB_TEXT_REVIEWED_RAW_BYTES_PENDING",
+      "original_document_sha256": null,
+      "retained_original_path": null,
+      "blocker": "Cloud egress allowlist rejects official host (CONNECT 403); search-tool rendered text is not original document bytes."
+    },
+    {
+      "source_id": "SEC-34-67242",
+      "url": "https://www.sec.gov/rules/sro/finra/2012/34-67242.pdf",
+      "publication_date": "2012-06-22",
+      "role": "TAF approval cross-check",
+      "review_locator": "2012 TAF change approval; source bytes pending",
+      "review_status": "WEB_TEXT_REVIEWED_RAW_BYTES_PENDING",
+      "original_document_sha256": null,
+      "retained_original_path": null,
+      "blocker": "Cloud egress allowlist rejects official host (CONNECT 403); search-tool rendered text is not original document bytes."
+    },
+    {
+      "source_id": "TAF-34-90176",
+      "url": "https://www.finra.org/sites/default/files/2020-10/NOF%20IMM%20EFF%20FINRA-2020-032.pdf",
+      "publication_date": "2020-10-14",
+      "role": "TAF SEC filing notice cross-check",
+      "review_locator": "Federal Register publication 2020-10-20; filing 2020-10-02; immediate effectiveness differs from phased implementation",
+      "review_status": "WEB_TEXT_REVIEWED_RAW_BYTES_PENDING",
+      "original_document_sha256": null,
+      "retained_original_path": null,
+      "blocker": "Cloud egress allowlist rejects official host (CONNECT 403); search-tool rendered text is not original document bytes."
+    },
+    {
+      "source_id": "SEC-34-49928",
+      "url": "https://www.sec.gov/files/rules/final/34-49928.htm",
+      "publication_date": "2004-06-28",
+      "role": "SEC charge-date semantics",
+      "review_locator": "Section II.A, Charge Date; Rule 31(a)(3): settlement / exercise / maturity / trade dates",
+      "review_status": "WEB_TEXT_REVIEWED_RAW_BYTES_PENDING",
+      "original_document_sha256": null,
+      "retained_original_path": null,
+      "blocker": "Cloud egress allowlist rejects official host (CONNECT 403); search-tool rendered text is not original document bytes."
+    },
+    {
+      "source_id": "FINRA-RULE-HISTORY",
+      "url": "https://www.finra.org/rules-guidance/rulebooks/corporate-organization/section-1-member-regulatory-fees",
+      "publication_date": null,
+      "role": "Amendment chronology only; no historical rate inferred from current text",
+      "review_locator": "SR-FINRA-2020-032 amendments Jan 1 2022/2023/2024; 2016-027 July 10 2017 requires raw historical cross-check",
+      "review_status": "WEB_TEXT_REVIEWED_RAW_BYTES_PENDING",
+      "original_document_sha256": null,
+      "retained_original_path": null,
+      "blocker": "Cloud egress allowlist rejects official host (CONNECT 403); search-tool rendered text is not original document bytes."
+    }
+  ]
+}
