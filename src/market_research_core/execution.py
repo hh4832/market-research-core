@@ -53,6 +53,11 @@ class ExecutionOrder:
             raise ValueError("strategy_id and experiment_id are required")
 
 
+LEGACY_VOLUME_BASIS = "FILL_BAR_REALIZED"
+KNOWN_VOLUME_BASIS = "LAST_COMPLETED_AT_FILL_OPEN"
+PARTICIPATION_VOLUME_BASES = (LEGACY_VOLUME_BASIS, KNOWN_VOLUME_BASIS)
+
+
 @dataclass(frozen=True)
 class ExecutionConfig:
     initial_cash: float
@@ -76,6 +81,12 @@ class ExecutionConfig:
     window_start: Any = None
     window_end: Any = None
     temporal_policy: TemporalPolicy | None = None
+    # Volume used by the cost profile's volume_participation_cap. FILL_BAR_REALIZED (legacy, default) compares the
+    # order with the fill bar's OWN volume, which is only known after that bar has finished: look-ahead, kept only so
+    # results produced before this setting existed stay reproducible, and flagged in provenance.
+    # LAST_COMPLETED_AT_FILL_OPEN uses the completed bar whose modeled_available_at equals the candidate's earliest
+    # possible open (same contract, same RTH session); no fallback to older bars. Conservative mode only.
+    participation_volume_basis: Literal["FILL_BAR_REALIZED", "LAST_COMPLETED_AT_FILL_OPEN"] = "FILL_BAR_REALIZED"
 
     def __post_init__(self) -> None:
         if self.initial_cash <= 0:
@@ -98,6 +109,10 @@ class ExecutionConfig:
             raise ValueError("BAR_END_STRICT_LATER forbids same-timestamp bar-open execution")
         if self.timestamp_timezone != "Asia/Taipei" and self.timestamp_timezone != "America/New_York" and not self.timestamp_timezone:
             raise ValueError("timestamp_timezone must be explicit")
+        if self.participation_volume_basis not in PARTICIPATION_VOLUME_BASES:
+            raise ValueError("unsupported participation_volume_basis")
+        if self.participation_volume_basis == KNOWN_VOLUME_BASIS and not conservative:
+            raise ValueError("LAST_COMPLETED_AT_FILL_OPEN is defined only for CONSERVATIVE_LABEL_AGNOSTIC execution")
 
 
 @dataclass
@@ -208,6 +223,16 @@ class ExecutionEngine:
             raise ValueError("BAR_END_STRICT_LATER requires available_at == bar_end")
         if frame["session"].astype(str).str.upper().eq("UNKNOWN").any():
             raise ValueError("formal execution is blocked for UNKNOWN session rows")
+
+        known_volume: dict[tuple[Any, ...], float] = {}
+        if config.participation_volume_basis == KNOWN_VOLUME_BASIS:
+            # Reference rows: completed RTH bars, keyed by the moment their volume is first known.
+            ref = frame[frame["session"].astype(str).eq("RTH")]
+            keys = list(zip(ref["symbol"], ref["market"], ref["contract"], ref["session_close"],
+                            pd.to_datetime(ref["modeled_available_at"], utc=True)))
+            if len(set(keys)) != len(keys):
+                raise ValueError("duplicate reference bars for one modeled_available_at")
+            known_volume = dict(zip(keys, ref["volume"].astype(float)))
 
         orders = sorted(
             list(orders),
@@ -390,6 +415,14 @@ class ExecutionEngine:
 
                 fill_profile = cost_schedule.profile_for(bar['bar_start']) if cost_schedule is not None else cost_profile
                 reason: str | None = None
+                participation: dict[str, Any] = {}
+                cap = fill_profile.volume_participation_cap
+                if config.participation_volume_basis == KNOWN_VOLUME_BASIS and cap is not None:
+                    ref_at = pd.Timestamp(bar["bar_start"]).tz_convert("UTC")
+                    ref_volume = known_volume.get((order.symbol, order.market, order.contract, bar["session_close"], ref_at))
+                    participation = {"participation_volume_basis": KNOWN_VOLUME_BASIS,
+                                     "participation_reference_modeled_available_at": ref_at.tz_convert(config.timestamp_timezone),
+                                     "participation_reference_volume": ref_volume, "participation_cap": cap}
                 cost_meta = fill_profile.configuration_metadata
                 fill_date = new_york_fill_date(bar['bar_start']) if cost_schedule is not None else bar['bar_start'].date().isoformat()
                 cost_date_ok = not cost_meta or (cost_meta['effective_from'] <= fill_date and
@@ -410,7 +443,12 @@ class ExecutionEngine:
                     reason = "BAR_NOT_ELIGIBLE"
                 elif float(bar["volume"]) <= 0:
                     reason = "ZERO_VOLUME_BAR"
-                elif fill_profile.volume_participation_cap is not None and qty > float(bar["volume"]) * fill_profile.volume_participation_cap:
+                elif participation and participation["participation_reference_volume"] is None:
+                    reason = "KNOWN_VOLUME_UNAVAILABLE"
+                elif participation and qty > participation["participation_reference_volume"] * cap:
+                    reason = "KNOWN_VOLUME_PARTICIPATION_EXCEEDED"
+                elif (config.participation_volume_basis == LEGACY_VOLUME_BASIS and cap is not None
+                      and qty > float(bar["volume"]) * cap):
                     reason = "VOLUME_PARTICIPATION_EXCEEDED"
                 else:
                     eligible_col = "buy_execution_eligible" if side == "BUY" else "sell_execution_eligible"
@@ -433,6 +471,7 @@ class ExecutionEngine:
                     rejects.append({
                         "order_id": oid, "bar_ts": bar["bar_start"], "reason": reason,
                         "detail": "candidate bar was not eligible for this order",
+                        **(participation if reason in ("KNOWN_VOLUME_UNAVAILABLE", "KNOWN_VOLUME_PARTICIPATION_EXCEEDED") else {}),
                     })
                     # NEXT_BAR has a single candidate. DAY keeps waiting after
                     # ordinary bar-level rejections until fill or expiry.
@@ -479,6 +518,7 @@ class ExecutionEngine:
                     "session": bar["session"], "execution_assumption": "SAME_TIMESTAMP_BAR_OPEN" if bar["bar_start"] == record["available"] else "NEXT_ELIGIBLE_BAR_OPEN",
                 }
                 fill.update(cost_parts)
+                fill.update(participation)
                 fill['raw_price'] = raw_price
                 fill['price_adjustment_cost'] = abs(Decimal(str(fill_price)) - Decimal(str(raw_price))) * Decimal(str(qty)) * Decimal(str(multiplier))
                 monetary_scale = Decimal(str(qty)) * Decimal(str(multiplier))
@@ -685,6 +725,11 @@ class ExecutionEngine:
                               temporal_policy=asdict(config.temporal_policy), source_timestamp_label='UNKNOWN',
                               modeled_available_at_rule='LATEST_START_END_COMPLETION',
                               execution_eligibility_scope='RESEARCH_ONLY')
+        provenance['participation_volume_basis'] = config.participation_volume_basis
+        if config.participation_volume_basis == LEGACY_VOLUME_BASIS:
+            provenance['participation_lookahead'] = 'FILL_BAR_REALIZED_VOLUME_USED'
+        else:
+            provenance['participation_contract'] = 'known-volume-participation-v1'
         provenance['cost_configuration'] = cost_profile.configuration_metadata
         provenance['fee_mode'] = cost_profile.fee_mode
         if cost_schedule is not None:
