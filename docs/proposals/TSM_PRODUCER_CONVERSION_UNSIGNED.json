@@ -1,0 +1,25 @@
+{
+  "status": "PROPOSED_UNSIGNED_NOT_AUTHORIZED",
+  "approved_by": "__RESEARCH_LEAD__",
+  "approval_ref": "https://__set_by_research_lead__",
+  "plan_sha256": null,
+  "allow_holdout_decode_for_conversion_only": false,
+  "allow_full_source_opaque_hash": false,
+  "allow_strategy_run": false,
+  "observed_source": {
+    "snapshot_id": "20261101_205431_06359faf7ef4_IBKR_FINAL_GATE_FULL",
+    "parquet": "tsm_normalized.parquet",
+    "file_bytes": 29363599,
+    "manifest_sha256_observed": "d960602cff24f7350b056d69e19d8e0b8734cdad266d3782bc56ebc507818828",
+    "parquet_sha256_claimed_not_independently_verified": "572d19476eecd38020da8ddbfbd5f7b128c7cd79d807e4f16fd787a66a8c96e7",
+    "opaque_hash_byte_range_half_open": [0, 29363599],
+    "decode_row_group": 1,
+    "decode_columns": ["timestamp_utc", "open", "high", "low", "close", "volume"],
+    "row_group_rows": 1048576,
+    "row_group_date_span": ["2021-12-14", "2026-05-26"],
+    "holdout_decode_may_occur": true,
+    "compressed_column_extents": "Resolve from actual footer using plan_conversion before signature; do not invent offsets"
+  },
+  "output_only": {"symbol": "TSM", "dates_inclusive_ET": ["2024-05-29", "2024-06-28"], "holdout_rows": 0},
+  "instructions": "Inventory isolated TSM upstream roots first. If no usable isolated source is available, review the actual metadata-only plan and personally sign an APPROVED artifact bound to its plan_sha256. This template is not executable approval. No research authorization or batch is granted by producer permission."
+}

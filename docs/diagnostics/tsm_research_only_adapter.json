@@ -1,0 +1,117 @@
+{
+  "schema_version": "1.0.0",
+  "phase": "4-A",
+  "verdict": "SCOPED_GO",
+  "baseline_sha": "699e3ad59951bbebb769bb69170be8d9a1a96c01",
+  "branch": "feature/phase4a-tsm-native-research-adapter",
+  "core_final_commit_sha": "07c13e4820a0550be5616562615206084ef4947a",
+  "core_commit_resolution": "market_research_core.tsm_native.core_code_identity()",
+  "policy": {
+    "id": "CONSERVATIVE_LABEL_AGNOSTIC",
+    "version": "1.0.0",
+    "sha256": "7fa3cdcaf501651f749dbc72c31b362fcb9e10cc55920191cef87c1a050059c4",
+    "scope": "RESEARCH_ONLY",
+    "timestamp_label": "UNKNOWN"
+  },
+  "native_snapshot": {
+    "snapshot_id": "20261101_205431_06359faf7ef4_IBKR_FINAL_GATE_FULL",
+    "history_start": "2016-10-19",
+    "history_end": "2026-10-16",
+    "actual_manifest_verified": false,
+    "actual_parquet_relative_path": null,
+    "actual_parquet_sha256": null,
+    "actual_parquet_schema": null,
+    "real_rows_read": 0,
+    "real_full_file_hash_performed": false,
+    "real_bounded_conversion": "PENDING_MISSING_INPUTS",
+    "holdout_boundaries": null,
+    "integrity": "TRUSTED_PINNED_SHA256_RECEIPT_WITH_UNCHANGED_STAT; NO_IMPLICIT_FULL_FILE_HASH",
+    "rowgroup_holdout_policy": "REJECT_IF_STATS_UNKNOWN_OR_CANDIDATE_GROUP_CROSSES_AUTHORIZATION_OR_HOLDOUT"
+  },
+  "costs": {
+    "commission": "USD .005/share/side; min1/order; max1%notional; FIXED",
+    "slippage_bps": {
+      "LOW": 1,
+      "BASE": 2,
+      "STRESS": 4
+    },
+    "half_spread_bps": 0,
+    "sec_actual_rate": null,
+    "sec_actual_record": "PENDING_EXISTING_DATE_VERSIONED_RECORD",
+    "taf_actual_rate": null,
+    "taf_actual_record": "PENDING_EXISTING_DATE_VERSIONED_RECORD",
+    "taf_model": "CONSERVATIVE_TAF_BOUND",
+    "taf_sides": "BOTH",
+    "taf_cap": null,
+    "cat_usd_per_share_per_side": {
+      "BASE": "0.00005",
+      "STRESS": "0.00010"
+    },
+    "cat_basis": "USER_APPROVED_RESEARCH_ASSUMPTION",
+    "cat_broker_passthrough_confirmed": false,
+    "cat_actual_upper_bound_confirmed": false,
+    "supported_interval": {
+      "start": "2024-06-03",
+      "end": "2024-06-28"
+    },
+    "cross_rate_switching": "UNSUPPORTED_NO_FORCED_CLOSE_OR_STITCHING",
+    "calculation": "EXISTING_COSTPROFILE_AND_EXECUTIONENGINE",
+    "diagnostics": "SEPARATE_SEC_TAF_CAT_SOURCES_RATES_UNROUNDED_MODELS_AND_ROUNDED_DEBITS",
+    "slippage_deducted_twice": false,
+    "formal_approval": false
+  },
+  "tests": {
+    "python3.11": {
+      "passed": 98,
+      "failed": 0,
+      "skipped": 0
+    },
+    "python3.12": {
+      "passed": 98,
+      "failed": 0,
+      "skipped": 0
+    },
+    "new_synthetic_cases": 14,
+    "actual_sec_taf_rate_evidence_used": false,
+    "fixtures_are_not_real_snapshot_evidence": true
+  },
+  "github": {
+    "ci": {
+      "status": "PASS",
+      "python_versions": [
+        "3.11",
+        "3.12"
+      ],
+      "run_url": "https://github.com/hh4832/market-research-core/actions/runs/42142215511",
+      "verified_commit": "07c13e4820a0550be5616562615206084ef4947a"
+    },
+    "phase4_pr": {
+      "status": "NOT_CREATED_API_FORBIDDEN",
+      "attempt": "gh pr create --base feature/m3a-ibkr-tsm-readiness --head feature/phase4a-tsm-native-research-adapter --body-file docs/PHASE4A_PR.md",
+      "error": "Post https://api.github.com/graphql: Forbidden"
+    },
+    "base_dependency": "PR3 feature/m3a-ibkr-tsm-readiness",
+    "phase3_branch_modified": false
+  },
+  "source_sha256": {
+    "src/market_research_core/tsm_native.py": "b7e958076853129456f4d13d29a5e05262ec06b49e93810766b45080c312e9ff",
+    "src/market_research_core/tsm_research_costs.py": "844369a482f00a6082577c95018325577dd78bd0fdf6d0c69b5ce87a204ee680",
+    "tests/test_phase4a_tsm.py": "e241c10d97e7abeca22c647727300e2fda596974baa4f6308f22cca978066013"
+  },
+  "scope": {
+    "source_data_modified": false,
+    "final_gate_rerun": false,
+    "full_tsm_strategy_run": false,
+    "existing_engine_modified": false,
+    "formal_entry_added": false
+  },
+  "external_blockers": [
+    "Actual existing manifest and explicit schema/path binding",
+    "Trusted integrity receipt or authorization for opaque-byte SHA verification",
+    "Explicit Holdout boundaries and compatible row-group isolation",
+    "Existing SEC and FINRA TAF effective-rate records",
+    "GitHub PR API access"
+  ],
+  "core_implementation_commit_sha": "07c13e4820a0550be5616562615206084ef4947a",
+  "delivery_commit_note": "This pins final implementation code; later documentation-only closure may differ. Native provenance/core_code_identity resolves exact installed checkout SHA."
+}

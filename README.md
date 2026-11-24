@@ -80,3 +80,8 @@ does not rerun historical validation.
 M3-A.4 engineering API, bounded synthetic evidence, cost JSON/YAML examples and
 Agent field definitions: [Temporal & Cost Contract](docs/M3A4_TEMPORAL_COST_CONTRACT.md).
 The label-agnostic research mode never upgrades real TSM to formal eligibility.
+
+Phase4-A bounded native TSM access and explicit TAF/CAT research assumptions:
+[TSM RESEARCH_ONLY Adapter Contract](docs/TSM_RESEARCH_ONLY_ADAPTER_CONTRACT.md).
+Actual manifest/rate binding and bounded real-data diagnostics remain pending;
+synthetic tests are not real snapshot evidence.

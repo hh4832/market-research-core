@@ -17,3 +17,6 @@ __all__ = ["BacktestAssumptions", "BacktestEngine", "BacktestRejected", "Backtes
 
 from .temporal import TemporalPolicy, CONSERVATIVE_POLICY, prepare_conservative_bars
 from .cost_config import load_cost_profile, configuration_sha256
+
+from .dated_costs import DatedCostSchedule, load_dated_cost_schedule, schedule_sha256
+__all__ += ["DatedCostSchedule", "load_dated_cost_schedule", "schedule_sha256"]

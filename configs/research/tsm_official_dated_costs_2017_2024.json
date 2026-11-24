@@ -1,0 +1,260 @@
+{
+  "contract": "tsm-dated-trading-costs-v1",
+  "schedule_id": "TSM-OFFICIAL-HISTORY-2017-2024",
+  "version": "1.0.0",
+  "schedule_sha256": "43b6045758760a40ad88d741b1a97a73cfb0b6cf6b2a4a7f1f3b31d5085a4216",
+  "scope": "RESEARCH_ONLY",
+  "evidence_kind": "VERIFIED_SOURCE_RECORDS",
+  "symbol": "TSM",
+  "market": "IBKR_EQUITY",
+  "timezone": "America/New_York",
+  "coverage": {
+    "start": "2017-01-01",
+    "end": "2024-12-31"
+  },
+  "scenarios": {
+    "BASE": {
+      "slippage_bps": 2,
+      "cat_per_share": "0.00005"
+    },
+    "LOW": {
+      "slippage_bps": 1,
+      "cat_per_share": "0.00005"
+    },
+    "STRESS": {
+      "slippage_bps": 4,
+      "cat_per_share": "0.00005"
+    },
+    "CAT_STRESS": {
+      "slippage_bps": 2,
+      "cat_per_share": "0.00010"
+    }
+  },
+  "base_profile": {
+    "profile_id": "tsm_official_history_research_base",
+    "version": "1.0.0",
+    "instrument_type": "EQUITY",
+    "approval_status": "DRAFT",
+    "source_evidence": "USER_PHASE4A research Fixed commission assumptions; official dated rates selected separately",
+    "basis": "ASSUMED",
+    "equity_commission_rate": 0,
+    "minimum_commission": 1,
+    "sell_tax_rate": 0,
+    "futures_fee_per_contract_per_side": 0,
+    "futures_transaction_tax_rate": 0,
+    "contract_multiplier": 1,
+    "tick_size": 0.01,
+    "slippage_ticks": 0,
+    "fee_rounding": "HALF_UP",
+    "tax_rounding": "HALF_UP",
+    "component_basis": {
+      "contract_multiplier": "ASSUMED",
+      "equity_commission_rate": "ASSUMED",
+      "fee_rounding": "ASSUMED",
+      "futures_fee_per_contract_per_side": "ASSUMED",
+      "futures_transaction_tax_rate": "ASSUMED",
+      "minimum_commission": "ASSUMED",
+      "sell_tax_rate": "ASSUMED",
+      "slippage_ticks": "ASSUMED",
+      "tax_rounding": "ASSUMED",
+      "tick_size": "ASSUMED",
+      "equity_slippage_bps": "ASSUMED",
+      "volume_participation_cap": "ASSUMED",
+      "commission_cap_rate": "ASSUMED",
+      "equity_commission_per_share": "ASSUMED",
+      "half_spread_bps": "ASSUMED"
+    },
+    "equity_commission_per_share": 0.005,
+    "equity_slippage_bps": 2,
+    "half_spread_bps": 0,
+    "sell_regulatory_fee_rate": null,
+    "volume_participation_cap": 0.01,
+    "component_evidence": {
+      "equity_slippage_bps": "https://www.interactivebrokers.com/en/pricing/commissions-stocks.php; NOT independently verified",
+      "volume_participation_cap": "https://www.interactivebrokers.com/en/pricing/commissions-stocks.php; NOT independently verified",
+      "commission_cap_rate": "https://www.interactivebrokers.com/en/pricing/commissions-stocks.php; NOT independently verified",
+      "equity_commission_per_share": "https://www.interactivebrokers.com/en/pricing/commissions-stocks.php; NOT independently verified",
+      "half_spread_bps": "https://www.interactivebrokers.com/en/pricing/commissions-stocks.php; NOT independently verified"
+    },
+    "component_approval_status": {
+      "equity_slippage_bps": "PENDING",
+      "volume_participation_cap": "PENDING",
+      "commission_cap_rate": "PENDING",
+      "equity_commission_per_share": "PENDING",
+      "half_spread_bps": "PENDING"
+    },
+    "commission_cap_rate": 0.01,
+    "exchange_fee_per_unit": null,
+    "clearing_fee_per_unit": null,
+    "regulatory_fee_per_unit": null,
+    "commission_scheme": "FIXED",
+    "fee_mode": "COMPONENTIZED",
+    "configuration_metadata": {
+      "scope": "RESEARCH_ONLY",
+      "date_convention": "NY_FILL_DATE_RESEARCH_CONVENTION_NOT_UNIVERSAL_SEC_CHARGE_DATE",
+      "sec_broker_charge_date_mapping": "DATA_PENDING",
+      "formal_cost_approval": false
+    }
+  },
+  "base_profile_sha256": "9587b35903894b993a8e01e5dfee298402872aefc99c4fb468ff1d27196d65ee",
+  "sec_rates": [
+    {
+      "version": "sec-2016-2-2017-01-01",
+      "effective_from": "2017-01-01",
+      "effective_to": "2017-07-03",
+      "rate": "0.0000218",
+      "unit": "USD_PER_NOTIONAL",
+      "source_ref": "https://www.sec.gov/newsroom/press-releases/2016-2",
+      "source_basis": "OFFICIAL",
+      "verification_status": "VERIFIED",
+      "source_document_sha256": "4535eeff87702d55b1b3105912b3ec158397430ddc62aff0f2f0adb2957652cb",
+      "record_sha256": "2b9e02596c2835332f2c0e25ddf9e705001f5a0e799c8de91e4ea15ee764bb1f"
+    },
+    {
+      "version": "sec-2017-111-2017-07-04",
+      "effective_from": "2017-07-04",
+      "effective_to": "2018-05-21",
+      "rate": "0.0000231",
+      "unit": "USD_PER_NOTIONAL",
+      "source_ref": "https://www.sec.gov/newsroom/press-releases/2017-111",
+      "source_basis": "OFFICIAL",
+      "verification_status": "VERIFIED",
+      "source_document_sha256": "a8a1adb275c7c31b36eb704cf22b7b858426af440c648a45055a8418459b2735",
+      "record_sha256": "ac17d671f6a3ade3be50d43349967db70a9a685a16cda03768684d9f8ddc570c"
+    },
+    {
+      "version": "sec-2018-67-2018-05-22",
+      "effective_from": "2018-05-22",
+      "effective_to": "2019-04-15",
+      "rate": "0.000013",
+      "unit": "USD_PER_NOTIONAL",
+      "source_ref": "https://www.sec.gov/newsroom/press-releases/2018-67",
+      "source_basis": "OFFICIAL",
+      "verification_status": "VERIFIED",
+      "source_document_sha256": "4b67948e5316329c52c547e4c68df4d2ff1d62ae3d0a6473a669f5baad2fa2f3",
+      "record_sha256": "ccc89b1664fd022f13d5275ec2e359a410bc5a8e485ca2d56feadde8ede2e271"
+    },
+    {
+      "version": "sec-2019-30-2019-04-16",
+      "effective_from": "2019-04-16",
+      "effective_to": "2020-02-17",
+      "rate": "0.0000207",
+      "unit": "USD_PER_NOTIONAL",
+      "source_ref": "https://www.sec.gov/newsroom/press-releases/2019-30",
+      "source_basis": "OFFICIAL",
+      "verification_status": "VERIFIED",
+      "source_document_sha256": "c35e8a4a4394bc2bd5f48145b18331bc45d2061ae69753f653b93849a89fff56",
+      "record_sha256": "5f6826f1d0d6f0211d611b5d01a648ee4d9ff8b0311e851dbef19287be242ced"
+    },
+    {
+      "version": "sec-2020-7-2020-02-18",
+      "effective_from": "2020-02-18",
+      "effective_to": "2021-02-24",
+      "rate": "0.0000221",
+      "unit": "USD_PER_NOTIONAL",
+      "source_ref": "https://www.sec.gov/newsroom/press-releases/2020-7",
+      "source_basis": "OFFICIAL",
+      "verification_status": "VERIFIED",
+      "source_document_sha256": "515a086c63f77079918e9683141f6edd936bdb65de98e29385ed6c5ae7973550",
+      "record_sha256": "b8fc134781d5848557f85af374efbee878bf95b3bd105107aa0931e484d6018f"
+    },
+    {
+      "version": "sec-2021-8-2021-02-25",
+      "effective_from": "2021-02-25",
+      "effective_to": "2022-05-13",
+      "rate": "0.0000051",
+      "unit": "USD_PER_NOTIONAL",
+      "source_ref": "https://www.sec.gov/newsroom/press-releases/2021-8",
+      "source_basis": "OFFICIAL",
+      "verification_status": "VERIFIED",
+      "source_document_sha256": "02c8324ca3a9a9db803e06fd970c1ec1f8be8041703520fd76bfd304bc2dc6af",
+      "record_sha256": "1fd19b6dd040f89283f62ce3e1993e097433a32b90afd87ced1fc8b9fefb9c93"
+    },
+    {
+      "version": "sec-2022-60-2022-05-14",
+      "effective_from": "2022-05-14",
+      "effective_to": "2023-02-26",
+      "rate": "0.0000229",
+      "unit": "USD_PER_NOTIONAL",
+      "source_ref": "https://www.sec.gov/newsroom/press-releases/2022-60",
+      "source_basis": "OFFICIAL",
+      "verification_status": "VERIFIED",
+      "source_document_sha256": "92e3d2266099c0735d2b1edac16afe4b1b3146cd7207e3fe9c281d04e1b04f1b",
+      "record_sha256": "cb3651300381dcacd5661536eea76eefba2245e0545df787a6404823ada5ea37"
+    },
+    {
+      "version": "sec-2023-15-2023-02-27",
+      "effective_from": "2023-02-27",
+      "effective_to": "2024-05-21",
+      "rate": "0.000008",
+      "unit": "USD_PER_NOTIONAL",
+      "source_ref": "https://www.sec.gov/newsroom/press-releases/2023-15",
+      "source_basis": "OFFICIAL",
+      "verification_status": "VERIFIED",
+      "source_document_sha256": "596dad0b1a212aa835313fbbf390d9ce41feabe334f72865184fde6e4664c206",
+      "record_sha256": "28a257e76007f8c811e9aaeca45ce2ed19e9b164c2d48dcb4e47cf28a887465a"
+    },
+    {
+      "version": "sec-2024-2-2024-05-22",
+      "effective_from": "2024-05-22",
+      "effective_to": "2024-12-31",
+      "rate": "0.0000278",
+      "unit": "USD_PER_NOTIONAL",
+      "source_ref": "https://www.sec.gov/rules-regulations/fee-rate-advisories/2024-2",
+      "source_basis": "OFFICIAL",
+      "verification_status": "VERIFIED",
+      "source_document_sha256": "994781fe09bdfd34d6518f62c882ba0bd95faf1ad8cdf0ad557e8ae358fc7ead",
+      "record_sha256": "e1a4946962efdf7138097a70ee543693a62a9746bda471601c2bf5f40de6c983"
+    }
+  ],
+  "taf_rates": [
+    {
+      "version": "finra-524551-2017-01-01",
+      "effective_from": "2017-01-01",
+      "effective_to": "2021-12-31",
+      "rate": "0.000119",
+      "unit": "USD_PER_SHARE",
+      "source_ref": "https://www.finra.org/rev/524551",
+      "source_basis": "OFFICIAL",
+      "verification_status": "VERIFIED",
+      "source_document_sha256": "ffe660782c995c19f5448451d21d997fec708523a4d6f841a7c883bfb9203adf",
+      "record_sha256": "126a331577e208a5817c43b67bd0b521fded66ca7b3441c71589dd0b3e45bfc7"
+    },
+    {
+      "version": "finra-2020-032-2022-01-01",
+      "effective_from": "2022-01-01",
+      "effective_to": "2022-12-31",
+      "rate": "0.000130",
+      "unit": "USD_PER_SHARE",
+      "source_ref": "https://www.finra.org/sites/default/files/2020-10/SR-FINRA-2020-032.pdf",
+      "source_basis": "OFFICIAL",
+      "verification_status": "VERIFIED",
+      "source_document_sha256": "ddac2be95898c8d7fd43c02e5e1d92fd953c2ccb0a5bf312bd5cc4342bd13cd0",
+      "record_sha256": "c05d58abd42c465a5fa511f8cf08819c03d2b7785f243e8961d82d259ced51c2"
+    },
+    {
+      "version": "finra-2020-032-2023-01-01",
+      "effective_from": "2023-01-01",
+      "effective_to": "2023-12-31",
+      "rate": "0.000145",
+      "unit": "USD_PER_SHARE",
+      "source_ref": "https://www.finra.org/sites/default/files/2020-10/SR-FINRA-2020-032.pdf",
+      "source_basis": "OFFICIAL",
+      "verification_status": "VERIFIED",
+      "source_document_sha256": "ddac2be95898c8d7fd43c02e5e1d92fd953c2ccb0a5bf312bd5cc4342bd13cd0",
+      "record_sha256": "7bd38aafe7af183a7dd65f7c99b49777f7d2c7c338d0e79b0fb23b66fa761ab5"
+    },
+    {
+      "version": "finra-2020-032-2024-01-01",
+      "effective_from": "2024-01-01",
+      "effective_to": "2024-12-31",
+      "rate": "0.000166",
+      "unit": "USD_PER_SHARE",
+      "source_ref": "https://www.finra.org/sites/default/files/2020-10/SR-FINRA-2020-032.pdf",
+      "source_basis": "OFFICIAL",
+      "verification_status": "VERIFIED",
+      "source_document_sha256": "ddac2be95898c8d7fd43c02e5e1d92fd953c2ccb0a5bf312bd5cc4342bd13cd0",
+      "record_sha256": "6cbbf1386b3aa4e2e73fe3ef2dc8f9d9ab9978fb63d98f9ec3a3477244874111"
+    }
+  ]
+}
